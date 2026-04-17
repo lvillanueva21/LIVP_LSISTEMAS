@@ -334,6 +334,30 @@ button:focus {
     line-height: 70px;
     color: #000000; }
 
+.header_area .navbar .nav .nav-item.nav-action-item {
+  display: flex;
+  align-items: center;
+  margin-right: 12px; }
+  .header_area .navbar .nav .nav-item.nav-action-item .nav-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: linear-gradient(90deg, #4458dc 0%, #854fee 100%);
+    color: #fff;
+    font: 500 12px/1 "Rubik", sans-serif;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    white-space: nowrap; }
+    .header_area .navbar .nav .nav-item.nav-action-item .nav-action-btn:hover {
+      color: #fff;
+      opacity: 0.92;
+      transform: translateY(-1px); }
+
 .owl-carousel.off {
   display: -ms-flexbox;
   display: flex; }
@@ -2977,6 +3001,13 @@ h6 {
 
   .header_area .navbar .nav .nav-item {
     margin-right: 0px; }
+
+  .header_area .navbar .nav .nav-item.nav-action-item {
+    margin-right: 0px;
+    align-items: flex-start; }
+    .header_area .navbar .nav .nav-item.nav-action-item .nav-action-btn {
+      margin: 8px 0 10px;
+      height: 32px; }
 
   .header_area + section,
   .header_area + row,

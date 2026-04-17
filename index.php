@@ -76,8 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email'], $_POST['name
 							<li class="nav-item"><a class="nav-link" href="#servicios">Servicios</a></li>
 							<li class="nav-item"><a class="nav-link" href="#contacto">Contáctame</a></li>
 							<li class="nav-item"><a class="nav-link" href="#proyectos">Mis proyectos</a></li>
-                            <li class="nav-item"><a class="primary_btn ml-2" href="#"><span>LSistemas</span></a></li>
-                            <li class="nav-item"><a class="primary_btn ml-2" href="#"><span>Seguros HL</span></a></li>
+                            <li class="nav-item nav-action-item"><a class="nav-action-btn" href="#">LSISTEMAS</a></li>
+                            <li class="nav-item nav-action-item"><a class="nav-action-btn" href="#">SEGUROS HL</a></li>
 </ul>
 					</div>
 				</div>
@@ -689,7 +689,6 @@ Copyright &copy;<script>document.write(new Date().getFullYear());</script> Todos
 	<script src="web/vendors/isotope/isotope-min.js"></script>
 	<script src="web/vendors/owl-carousel/owl.carousel.min.js"></script>
 	<script src="web/js/jquery.ajaxchimp.min.js"></script>
-	<script src="web/js/mail-script.js"></script>
 	<!--gmaps Js-->
 	<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjCGmQ0Uq4exrzdcL6rvxywDDOvfAu6eE"></script>
 	<script src="web/js/gmaps.min.js"></script>

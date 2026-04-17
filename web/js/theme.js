@@ -34,7 +34,24 @@
             Isotope js Starts
          --------------------------------------------- */
 	$(window).on('load', function() {
+		var $workGrid = null;
+		var hasPortfolioSection = $('#portfolio, #proyectos').length > 0;
+
+		if (hasPortfolioSection && $('.portfolio-grid').length) {
+			$workGrid = $('.portfolio-grid').isotope({
+				itemSelector: '.all',
+				percentPosition: true,
+				masonry: {
+					columnWidth: '.all'
+				}
+			});
+		}
+
 		$('.portfolio-filter ul li').on('click', function() {
+			if (!$workGrid) {
+				return;
+			}
+
 			$('.portfolio-filter ul li').removeClass('active');
 			$(this).addClass('active');
 
@@ -43,16 +60,6 @@
 				filter: data
 			});
 		});
-
-		if (document.getElementById('portfolio')) {
-			var $workGrid = $('.portfolio-grid').isotope({
-				itemSelector: '.all',
-				percentPosition: true,
-				masonry: {
-					columnWidth: '.all'
-				}
-			});
-		}
 	});
 
 	/*----------------------------------------------------*/
