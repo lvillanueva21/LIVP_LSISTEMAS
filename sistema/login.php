@@ -67,6 +67,29 @@ $mensajeBienvenida = $saludo . '. ' . $mensajes[array_rand($mensajes)];
 
     #password-field { padding-right: 2.25rem; }
 
+    .login-cover-carousel .carousel-item {
+      height: 220px;
+    }
+
+    .login-cover-carousel .carousel-item img {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      cursor: zoom-in;
+    }
+
+    .login-cover-carousel .carousel-control-prev,
+    .login-cover-carousel .carousel-control-next {
+      width: 12%;
+    }
+
+    .login-cover-carousel .carousel-control-prev-icon,
+    .login-cover-carousel .carousel-control-next-icon {
+      background-color: rgba(0, 0, 0, 0.35);
+      border-radius: 999px;
+      background-size: 55% 55%;
+    }
+
     .text-decoration-none:hover { text-decoration: underline !important; }
   </style>
 </head>
@@ -82,7 +105,42 @@ $mensajeBienvenida = $saludo . '. ' . $mensajes[array_rand($mensajes)];
     <div class="row justify-content-center">
       <div class="col-md-7 col-lg-5">
         <div class="wrap">
-          <div class="img" style="background-image: url('assets/img/MTC_PRO_inline.webp');"></div>
+          <div id="loginCoverCarousel" class="carousel slide login-cover-carousel" data-bs-ride="carousel" data-bs-interval="5000">
+            <div class="carousel-indicators">
+              <button type="button" data-bs-target="#loginCoverCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Imagen 1"></button>
+              <button type="button" data-bs-target="#loginCoverCarousel" data-bs-slide-to="1" aria-label="Imagen 2"></button>
+            </div>
+            <div class="carousel-inner">
+              <div class="carousel-item active">
+                <img
+                  src="assets/img/card_01.webp"
+                  class="d-block w-100 js-cover-image"
+                  alt="Portada card 01"
+                  data-bs-toggle="modal"
+                  data-bs-target="#coverImageModal"
+                  data-full-src="assets/img/card_01.webp"
+                  data-download-name="card_01.webp"
+                >
+              </div>
+              <div class="carousel-item">
+                <img
+                  src="assets/img/card_02.webp"
+                  class="d-block w-100 js-cover-image"
+                  alt="Portada card 02"
+                  data-bs-toggle="modal"
+                  data-bs-target="#coverImageModal"
+                  data-full-src="assets/img/card_02.webp"
+                  data-download-name="card_02.webp"
+                >
+              </div>
+            </div>
+            <button class="carousel-control-prev" type="button" data-bs-target="#loginCoverCarousel" data-bs-slide="prev" aria-label="Anterior">
+              <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#loginCoverCarousel" data-bs-slide="next" aria-label="Siguiente">
+              <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            </button>
+          </div>
 
           <div class="login-wrap p-4 p-md-5">
             <div class="d-flex align-items-center mb-2">
@@ -213,8 +271,45 @@ $mensajeBienvenida = $saludo . '. ' . $mensajes[array_rand($mensajes)];
   </div>
 </section>
 
+<div class="modal fade" id="coverImageModal" tabindex="-1" aria-labelledby="coverImageModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="coverImageModalLabel">Vista de la imagen</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="coverModalImage" src="" class="img-fluid rounded" alt="Vista ampliada">
+      </div>
+      <div class="modal-footer">
+        <a id="coverModalDownload" class="btn btn-primary" href="#" download>Descargar imagen</a>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+  (function () {
+    var coverImages = document.querySelectorAll('.js-cover-image');
+    var modalImage = document.getElementById('coverModalImage');
+    var modalDownload = document.getElementById('coverModalDownload');
+
+    if (!coverImages.length || !modalImage || !modalDownload) return;
+
+    coverImages.forEach(function (item) {
+      item.addEventListener('click', function () {
+        var src = this.getAttribute('data-full-src') || this.getAttribute('src');
+        var downloadName = this.getAttribute('data-download-name') || 'imagen.webp';
+
+        modalImage.setAttribute('src', src);
+        modalDownload.setAttribute('href', src);
+        modalDownload.setAttribute('download', downloadName);
+      });
+    });
+  })();
+
   (function () {
     var toggler = document.querySelector('.toggle-password');
     if (!toggler) return;
