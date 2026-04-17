@@ -1,3 +1,39 @@
+<?php
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email'], $_POST['name'], $_POST['subject'], $_POST['message'])) {
+    $to = 'rockybd1995@gmail.com';
+    $from = $_POST['email'];
+    $name = $_POST['name'];
+    $subject = $_POST['subject'];
+    $number = isset($_POST['number']) ? $_POST['number'] : '';
+    $cmessage = $_POST['message'];
+
+    $headers = "From: " . $from . "\r\n";
+    $headers .= "Reply-To: " . $from . "\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= "Content-Type: text/html; charset=ISO-8859-1\r\n";
+
+    $mailSubject = "You have a message from your Bitmap Photography.";
+    $logo = 'web/img/logo.png';
+    $link = '#';
+
+    $body = "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>Express Mail</title></head><body>";
+    $body .= "<table style='width: 100%;'>";
+    $body .= "<thead style='text-align: center;'><tr><td style='border:none;' colspan='2'>";
+    $body .= "<a href='{$link}'><img src='{$logo}' alt=''></a><br><br>";
+    $body .= "</td></tr></thead><tbody><tr>";
+    $body .= "<td style='border:none;'><strong>Name:</strong> {$name}</td>";
+    $body .= "<td style='border:none;'><strong>Email:</strong> {$from}</td>";
+    $body .= "</tr>";
+    $body .= "<tr><td style='border:none;'><strong>Subject:</strong> {$subject}</td></tr>";
+    $body .= "<tr><td style='border:none;'><strong>Number:</strong> {$number}</td></tr>";
+    $body .= "<tr><td></td></tr>";
+    $body .= "<tr><td colspan='2' style='border:none;'>{$cmessage}</td></tr>";
+    $body .= "</tbody></table>";
+    $body .= "</body></html>";
+
+    @mail($to, $mailSubject, $body, $headers);
+}
+?>
 <!doctype html>
 <html lang="en">
 
@@ -26,7 +62,7 @@
 			<nav class="navbar navbar-expand-lg navbar-light">
 				<div class="container">
 					<!-- Brand and toggle get grouped for better mobile display -->
-					<a class="navbar-brand logo_h" href="index.html"><img src="web/img/logo.png" alt=""></a>
+					<a class="navbar-brand logo_h" href="#inicio"><img src="web/img/logo.png" alt=""></a>
 					<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
 					 aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
 						<span class="icon-bar"></span>
@@ -36,29 +72,11 @@
 					<!-- Collect the nav links, forms, and other content for toggling -->
 					<div class="collapse navbar-collapse offset" id="navbarSupportedContent">
 						<ul class="nav navbar-nav menu_nav justify-content-end">
-							<li class="nav-item active"><a class="nav-link" href="index.html">Inicio</a></li>
-							<li class="nav-item"><a class="nav-link" href="services.html">Servicios</a></li>
-							<li class="nav-item"><a class="nav-link" href="about.html">Contáctame</a></li>
-							<li class="nav-item"><a class="nav-link" href="portfolio.html">Mis proyectos</a></li>
-							<!-- <li class="nav-item submenu dropdown">
-								<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-								 aria-expanded="false">Pages</a>
-								<ul class="dropdown-menu">
-									<li class="nav-item"><a class="nav-link" href="elements.html">Elements</a></li>
-									<li class="nav-item"><a class="nav-link" href="portfolio-details.html">Portfolio Details</a></li>
-								</ul>
-							</li> 
-							<li class="nav-item submenu dropdown">
-								<a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-								 aria-expanded="false">Blog</a>
-								<ul class="dropdown-menu">
-									<li class="nav-item"><a class="nav-link" href="blog.html">Blog</a></li>
-									<li class="nav-item"><a class="nav-link" href="single-blog.html">Blog Details</a></li>
-								</ul>
-							</li>
-
-							-->
-						</ul>
+							<li class="nav-item active"><a class="nav-link" href="#inicio">Inicio</a></li>
+							<li class="nav-item"><a class="nav-link" href="#servicios">Servicios</a></li>
+							<li class="nav-item"><a class="nav-link" href="#contacto">Contáctame</a></li>
+							<li class="nav-item"><a class="nav-link" href="#proyectos">Mis proyectos</a></li>
+</ul>
 					</div>
 				</div>
 			</nav>
@@ -67,7 +85,7 @@
 	<!--================ End Header Area =================-->
 
 	<!--================ Start Home Banner Area =================-->
-	<section class="home_banner_area">
+	<section class="home_banner_area" id="inicio">
 		<div class="banner_inner">
 			<div class="container">
 				<div class="row">
@@ -77,7 +95,7 @@
 							<h1 class="text-uppercase">Soy Luigi Villanueva</h1>
 							<h5 class="text-uppercase">Desarrollador de Sistemas Informáticos</h5>
 							<div class="d-flex align-items-center">
-								<a class="primary_btn" href="#"><span>Contáctame</span></a>
+								<a class="primary_btn" href="#contacto"><span>Contáctame</span></a>
 								<a class="primary_btn tr-bg" href="#"><span>Descarga mi CV</span></a>
 							</div>
 						</div>
@@ -94,7 +112,7 @@
 	<!--================ End Home Banner Area =================-->
 
 	<!--================ Start About Us Area =================-->
-	<section class="about_area section_gap">
+	<section class="about_area section_gap" id="sobre-mi">
 		<div class="container">
 			<div class="row justify-content-start align-items-center">
 				<div class="col-lg-5">
@@ -219,7 +237,7 @@
 	<!--================ End Brand Area =================-->
 
 	<!--================ Start Features Area =================-->
-	<section class="features_area">
+	<section class="features_area" id="servicios">
 		<div class="container">
 			<div class="row justify-content-center">
 				<div class="col-lg-8 text-center">
@@ -267,7 +285,7 @@
 	<!--================ End Features Area =================-->
 
 	<!--================Start Portfolio Area =================-->
-	<section class="portfolio_area" id="portfolio">
+	<section class="portfolio_area" id="proyectos">
 		<div class="container">
 			<div class="row">
 				<div class="col-lg-12">
@@ -300,7 +318,7 @@
 								</a>
 							</div>
 							<div class="short_info">
-								<h4><a href="portfolio-details.html">minimal design</a></h4>
+								<h4><a href="#proyectos">minimal design</a></h4>
 								<p>Animated, portfolio</p>
 							</div>
 						</div>
@@ -317,7 +335,7 @@
 								</a>
 							</div>
 							<div class="short_info">
-								<h4><a href="portfolio-details.html">Paint wall</a></h4>
+								<h4><a href="#proyectos">Paint wall</a></h4>
 								<p>Animated, portfolio</p>
 							</div>
 						</div>
@@ -334,7 +352,7 @@
 								</a>
 							</div>
 							<div class="short_info">
-								<h4><a href="portfolio-details.html">female light</a></h4>
+								<h4><a href="#proyectos">female light</a></h4>
 								<p>Animated, portfolio</p>
 							</div>
 						</div>
@@ -351,7 +369,7 @@
 								</a>
 							</div>
 							<div class="short_info">
-								<h4><a href="portfolio-details.html">fourth air</a></h4>
+								<h4><a href="#proyectos">fourth air</a></h4>
 								<p>Animated, portfolio</p>
 							</div>
 						</div>
@@ -368,7 +386,7 @@
 								</a>
 							</div>
 							<div class="short_info">
-								<h4><a href="portfolio-details.html">together sign</a></h4>
+								<h4><a href="#proyectos">together sign</a></h4>
 								<p>Animated, portfolio</p>
 							</div>
 						</div>
@@ -385,7 +403,7 @@
 								</a>
 							</div>
 							<div class="short_info">
-								<h4><a href="portfolio-details.html">multiply fowl</a></h4>
+								<h4><a href="#proyectos">multiply fowl</a></h4>
 								<p>Animated, portfolio</p>
 							</div>
 						</div>
@@ -402,7 +420,7 @@
 								</a>
 							</div>
 							<div class="short_info">
-								<h4><a href="portfolio-details.html">green heaven</a></h4>
+								<h4><a href="#proyectos">green heaven</a></h4>
 								<p>Animated, portfolio</p>
 							</div>
 						</div>
@@ -436,7 +454,7 @@
 								</a>
 							</div>
 							<div class="short_info">
-								<h4><a href="portfolio-details.html">season face</a></h4>
+								<h4><a href="#proyectos">season face</a></h4>
 								<p>Animated, portfolio</p>
 							</div>
 						</div>
@@ -544,6 +562,62 @@
 		</div>
 	</div>
 	<!--================ End Testimonial Area =================-->
+	<!--================Contact Area =================-->
+	<section class="contact_area section_gap" id="contacto">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-3">
+					<div class="contact_info">
+						<div class="info_item">
+							<i class="lnr lnr-home"></i>
+							<h6>California, United States</h6>
+							<p>Santa monica bullevard</p>
+						</div>
+						<div class="info_item">
+							<i class="lnr lnr-phone-handset"></i>
+							<h6><a href="#">00 (440) 9865 562</a></h6>
+							<p>Mon to Fri 9am to 6 pm</p>
+						</div>
+						<div class="info_item">
+							<i class="lnr lnr-envelope"></i>
+							<h6><a href="#">support@colorlib.com</a></h6>
+							<p>Send us your query anytime!</p>
+						</div>
+					</div>
+				</div>
+				<div class="col-lg-9">
+					<form class="row contact_form" action="index.php#contacto" method="post" id="contactForm" novalidate="novalidate">
+						<div class="col-md-6">
+							<div class="form-group">
+								<input type="text" class="form-control" id="name" name="name" placeholder="Enter your name">
+							</div>
+							<div class="form-group">
+								<input type="email" class="form-control" id="email" name="email" placeholder="Enter email address">
+							</div>
+							<div class="form-group">
+								<input type="text" class="form-control" id="subject" name="subject" placeholder="Enter Subject">
+							</div>
+						</div>
+						<div class="col-md-6">
+							<div class="form-group">
+								<textarea class="form-control" name="message" id="message" rows="1" placeholder="Enter Message"></textarea>
+							</div>
+						</div>
+						<div class="col-md-12 text-right">
+							<button type="submit" value="submit" class="primary_btn">
+								<span>Send Message</span>
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+			<div id="mapBox" class="mapBox" data-lat="40.701083" data-lon="-74.1522848" data-zoom="13"
+				data-info="PO Box CT16122 Collins Street West, Victoria 8007, Australia." data-mlat="40.701083"
+				data-mlon="-74.1522848">
+			</div>
+		</div>
+	</section>
+	<!--================Contact Area =================-->
 
 	<!--================ Start Newsletter Area =================-->
 	<section class="newsletter_area">
