@@ -75,19 +75,18 @@ $mensajeBienvenida = $saludo . '. ' . $mensajes[array_rand($mensajes)];
       width: 100%;
       height: 220px;
       object-fit: cover;
-      cursor: zoom-in;
+      cursor: grab;
+      -webkit-user-drag: none;
+      user-select: none;
     }
 
-    .login-cover-carousel .carousel-control-prev,
-    .login-cover-carousel .carousel-control-next {
-      width: 12%;
+    .login-cover-carousel .carousel-inner {
+      cursor: grab;
     }
 
-    .login-cover-carousel .carousel-control-prev-icon,
-    .login-cover-carousel .carousel-control-next-icon {
-      background-color: rgba(0, 0, 0, 0.35);
-      border-radius: 999px;
-      background-size: 55% 55%;
+    .login-cover-carousel.is-dragging .carousel-inner,
+    .login-cover-carousel.is-dragging .carousel-item img {
+      cursor: grabbing;
     }
 
     .text-decoration-none:hover { text-decoration: underline !important; }
@@ -105,17 +104,14 @@ $mensajeBienvenida = $saludo . '. ' . $mensajes[array_rand($mensajes)];
     <div class="row justify-content-center">
       <div class="col-md-7 col-lg-5">
         <div class="wrap">
-          <div id="loginCoverCarousel" class="carousel slide login-cover-carousel" data-bs-ride="carousel" data-bs-interval="5000">
-            <div class="carousel-indicators">
-              <button type="button" data-bs-target="#loginCoverCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Imagen 1"></button>
-              <button type="button" data-bs-target="#loginCoverCarousel" data-bs-slide-to="1" aria-label="Imagen 2"></button>
-            </div>
+          <div id="loginCoverCarousel" class="carousel slide login-cover-carousel" data-bs-ride="carousel" data-bs-interval="5000" data-bs-touch="false">
             <div class="carousel-inner">
               <div class="carousel-item active">
                 <img
                   src="assets/img/card_01.webp"
                   class="d-block w-100 js-cover-image"
                   alt="Portada card 01"
+                  draggable="false"
                   data-bs-toggle="modal"
                   data-bs-target="#coverImageModal"
                   data-full-src="assets/img/card_01.webp"
@@ -127,6 +123,7 @@ $mensajeBienvenida = $saludo . '. ' . $mensajes[array_rand($mensajes)];
                   src="assets/img/card_02.webp"
                   class="d-block w-100 js-cover-image"
                   alt="Portada card 02"
+                  draggable="false"
                   data-bs-toggle="modal"
                   data-bs-target="#coverImageModal"
                   data-full-src="assets/img/card_02.webp"
@@ -134,12 +131,6 @@ $mensajeBienvenida = $saludo . '. ' . $mensajes[array_rand($mensajes)];
                 >
               </div>
             </div>
-            <button class="carousel-control-prev" type="button" data-bs-target="#loginCoverCarousel" data-bs-slide="prev" aria-label="Anterior">
-              <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-            </button>
-            <button class="carousel-control-next" type="button" data-bs-target="#loginCoverCarousel" data-bs-slide="next" aria-label="Siguiente">
-              <span class="carousel-control-next-icon" aria-hidden="true"></span>
-            </button>
           </div>
 
           <div class="login-wrap p-4 p-md-5">
@@ -291,6 +282,72 @@ $mensajeBienvenida = $saludo . '. ' . $mensajes[array_rand($mensajes)];
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+  (function () {
+    var carouselEl = document.getElementById('loginCoverCarousel');
+    if (!carouselEl) return;
+
+    var coverImages = carouselEl.querySelectorAll('.js-cover-image');
+    var carousel = bootstrap.Carousel.getOrCreateInstance(carouselEl, {
+      interval: 5000,
+      touch: false,
+      pause: false
+    });
+
+    var startX = 0;
+    var pointerDown = false;
+    var dragMoved = false;
+    var suppressClick = false;
+    var dragThreshold = 35;
+
+    carouselEl.addEventListener('pointerdown', function (event) {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+      pointerDown = true;
+      dragMoved = false;
+      startX = event.clientX;
+      carouselEl.classList.add('is-dragging');
+    });
+
+    carouselEl.addEventListener('pointermove', function (event) {
+      if (!pointerDown) return;
+      if (Math.abs(event.clientX - startX) > 6) {
+        dragMoved = true;
+      }
+    });
+
+    function endDrag(event) {
+      if (!pointerDown) return;
+
+      var diffX = event.clientX - startX;
+      pointerDown = false;
+      carouselEl.classList.remove('is-dragging');
+
+      if (Math.abs(diffX) >= dragThreshold) {
+        if (diffX < 0) {
+          carousel.next();
+        } else {
+          carousel.prev();
+        }
+        suppressClick = true;
+        setTimeout(function () {
+          suppressClick = false;
+        }, 0);
+      }
+    }
+
+    carouselEl.addEventListener('pointerup', endDrag);
+    carouselEl.addEventListener('pointercancel', endDrag);
+
+    coverImages.forEach(function (image) {
+      image.addEventListener('click', function (event) {
+        if (suppressClick || dragMoved) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      });
+    });
+  })();
+
   (function () {
     var coverImages = document.querySelectorAll('.js-cover-image');
     var modalImage = document.getElementById('coverModalImage');
