@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email'], $_POST['name
 							<li class="nav-item"><a class="nav-link" href="#servicios">Servicios</a></li>
 							<li class="nav-item"><a class="nav-link" href="#contacto">Contáctame</a></li>
 							<li class="nav-item"><a class="nav-link" href="#proyectos">Mis proyectos</a></li>
-                            <li class="nav-item nav-action-item"><a class="nav-action-btn" href="#">LSISTEMAS</a></li>
+                            <li class="nav-item nav-action-item"><a class="nav-action-btn" href="sistema/login.php">LSISTEMAS</a></li>
                             <li class="nav-item nav-action-item"><a class="nav-action-btn" href="#">SEGUROS HL</a></li>
 </ul>
 					</div>
