@@ -3,21 +3,46 @@
 date_default_timezone_set('America/Lima');
 $hour = (int) date('G');
 if ($hour < 12) {
-    $saludo = 'Buenos días';
+    $saludo = '¡Buenos días!';
 } elseif ($hour < 19) {
-    $saludo = 'Buenas tardes';
+    $saludo = '¡Buenas tardes!';
 } else {
-    $saludo = 'Buenas noches';
+    $saludo = '¡Buenas noches!';
 }
 
+$emojis = ['🌟', '🚀', '💡', '✨', '👋', '🧠', '⚡', '🔐', '📌', '✅'];
 $mensajes = [
-    'Tu compromiso hace la diferencia cada día.',
-    'Gracias por contribuir con calidad y eficiencia.',
-    'Cada acción cuenta para lograr resultados.',
-    'Hoy es un buen día para seguir avanzando.',
-    'La seguridad comienza contigo.'
+    '{saludo} {emoji} Tu compromiso hace la diferencia cada día.',
+    '{saludo} {emoji} Sigamos trabajando por un mejor servicio.',
+    'Bienvenid@ {emoji} Gracias por contribuir con la calidad y eficiencia del sistema.',
+    '{saludo} {emoji} Cada acción cuenta para lograr resultados.',
+    '¡Excelente jornada por delante! {emoji}',
+    '{emoji} Recuerda: la precisión también es parte del progreso.',
+    '{saludo} {emoji} Qué gusto verte de nuevo.',
+    '¡Hola! {emoji} Esperamos que hoy tengas un gran día.',
+    '{saludo} {emoji} Siempre es bueno verte por aquí.',
+    'Bienvenid@ de nuevo {emoji} ¡Vamos con todo hoy!',
+    '{emoji} Gracias por seguir confiando en nosotros.',
+    '{saludo} {emoji} Tu trabajo impulsa grandes resultados.',
+    '{saludo} {emoji} Cada día es una oportunidad para mejorar.',
+    '{emoji} Hoy es un buen día para avanzar un paso más.',
+    '{saludo} {emoji} El éxito comienza con un inicio de sesión.',
+    '{emoji} ¡Activa tu potencial y haz que cuente!',
+    '{saludo} {emoji} Grandes cosas comienzan con pequeños clics.',
+    '{emoji} Inspira, mejora, impacta. ¡Vamos con todo!',
+    '{emoji} Recuerda: la seguridad comienza contigo.',
+    '{saludo} {emoji} Verifica tus credenciales antes de continuar.',
+    '{saludo} 👋 ¿Listo para continuar?',
+    '¡Hola! {emoji} Gracias por usar el sistema.',
+    '¡Qué gusto verte por aquí! {emoji}',
+    '{saludo} {emoji} Hoy es un buen día para avanzar.'
 ];
-$mensajeBienvenida = $saludo . '. ' . $mensajes[array_rand($mensajes)];
+$plantilla = $mensajes[array_rand($mensajes)];
+$mensajeBienvenida = str_replace(
+    ['{saludo}', '{emoji}'],
+    [$saludo, $emojis[array_rand($emojis)]],
+    $plantilla
+);
 ?>
 <!doctype html>
 <html lang="es">
