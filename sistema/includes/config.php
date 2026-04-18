@@ -14,7 +14,7 @@ return [
         'charset' => 'utf8mb4',
     ],
     'app' => [
-        'timezone'     => 'America/Bogota',
+        'timezone'     => 'America/Lima',
         'session_name' => 'lsis_sess',
         'install_key'  => getenv('LSIS_INSTALL_KEY') ?: 'LSistemas@@2026',
     ],
