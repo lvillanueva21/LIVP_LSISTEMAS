@@ -16,5 +16,6 @@ return [
     'app' => [
         'timezone'     => 'America/Bogota',
         'session_name' => 'lsis_sess',
+        'install_key'  => getenv('LSIS_INSTALL_KEY') ?: '',
     ],
 ];

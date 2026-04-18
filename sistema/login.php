@@ -1,5 +1,17 @@
 <?php
 require __DIR__ . '/includes/auth.php';
+require __DIR__ . '/includes/instalacion.php';
+
+$isAjaxSetup = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+if (!lsis_is_initialized()) {
+    if ($isAjaxSetup) {
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['ok' => false, 'redirect' => 'registro_inicial.php']);
+        exit;
+    }
+    header('Location: registro_inicial.php');
+    exit;
+}
 
 if (isAuthenticated()) {
     header('Location: inicio.php');
@@ -504,6 +516,10 @@ $mensajeBienvenida = str_replace(
         }
 
         if (!response || response.ok !== true) {
+          if (response && response.redirect) {
+            window.location.href = response.redirect;
+            return;
+          }
           var msg = (response && response.error) ? response.error : 'No se pudo iniciar sesión.';
           feedback.textContent = msg;
           feedback.classList.remove('d-none');
