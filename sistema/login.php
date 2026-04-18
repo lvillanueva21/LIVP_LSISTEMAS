@@ -1,4 +1,49 @@
-﻿<?php
+<?php
+require __DIR__ . '/includes/auth.php';
+
+if (isAuthenticated()) {
+    header('Location: inicio.php');
+    exit;
+}
+
+$err = '';
+$notice = '';
+$usuarioForm = '';
+
+if (isset($_GET['m']) && $_GET['m'] === 'sesion') {
+    $notice = 'Inicia sesión para continuar.';
+}
+if (isset($_GET['m']) && $_GET['m'] === 'logout') {
+    $notice = 'Sesión cerrada correctamente.';
+}
+
+$isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $usuarioForm = trim((string)($_POST['usuario'] ?? ''));
+    $clave = (string)($_POST['clave'] ?? '');
+
+    $r = login($usuarioForm, $clave);
+
+    if ($r['ok']) {
+        if ($isAjax) {
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['ok' => true, 'redirect' => 'inicio.php']);
+            exit;
+        }
+
+        header('Location: inicio.php');
+        exit;
+    }
+
+    $err = $r['error'] ?? 'No se pudo iniciar sesión.';
+
+    if ($isAjax) {
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['ok' => false, 'error' => $err]);
+        exit;
+    }
+}
 
 date_default_timezone_set('America/Lima');
 $hour = (int) date('G');
@@ -54,7 +99,7 @@ $mensajeBienvenida = str_replace(
 
   <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 
   <style>
@@ -129,7 +174,7 @@ $mensajeBienvenida = str_replace(
     <div class="row justify-content-center">
       <div class="col-md-7 col-lg-5">
         <div class="wrap">
-          <div id="loginCoverCarousel" class="carousel slide login-cover-carousel" data-bs-ride="carousel" data-bs-interval="5000" data-bs-touch="false">
+          <div id="loginCoverCarousel" class="carousel slide login-cover-carousel" data-ride="carousel" data-interval="5000">
             <div class="carousel-inner">
               <div class="carousel-item active">
                 <img
@@ -137,8 +182,8 @@ $mensajeBienvenida = str_replace(
                   class="d-block w-100 js-cover-image"
                   alt="Portada card 01"
                   draggable="false"
-                  data-bs-toggle="modal"
-                  data-bs-target="#coverImageModal"
+                  data-toggle="modal"
+                  data-target="#coverImageModal"
                   data-full-src="assets/img/card_01.webp"
                   data-download-name="card_01.webp"
                 >
@@ -149,8 +194,8 @@ $mensajeBienvenida = str_replace(
                   class="d-block w-100 js-cover-image"
                   alt="Portada card 02"
                   draggable="false"
-                  data-bs-toggle="modal"
-                  data-bs-target="#coverImageModal"
+                  data-toggle="modal"
+                  data-target="#coverImageModal"
                   data-full-src="assets/img/card_02.webp"
                   data-download-name="card_02.webp"
                 >
@@ -183,6 +228,16 @@ $mensajeBienvenida = str_replace(
               </div>
             </div>
 
+            <?php if ($notice !== ''): ?>
+              <div class="alert alert-info py-2 mb-3" role="alert"><?php echo htmlspecialchars($notice, ENT_QUOTES, 'UTF-8'); ?></div>
+            <?php endif; ?>
+
+            <?php if ($err !== ''): ?>
+              <div class="alert alert-danger py-2 mb-3" role="alert"><?php echo htmlspecialchars($err, ENT_QUOTES, 'UTF-8'); ?></div>
+            <?php endif; ?>
+
+            <div id="login-feedback" class="alert alert-danger py-2 mb-3 d-none" role="alert"></div>
+
             <div id="login-message" class="alert alert-info py-2 mb-3 d-none" role="alert">
               Esta pantalla es solo de presentación visual. La autenticación aún no está implementada.
             </div>
@@ -195,9 +250,9 @@ $mensajeBienvenida = str_replace(
                     class="fa fa-info-circle info-icon"
                     tabindex="0"
                     role="button"
-                    data-bs-toggle="tooltip"
-                    data-bs-placement="right"
-                    data-bs-title="Tu usuario es tu documento de identidad."
+                    data-toggle="tooltip"
+                    data-placement="right"
+                    title="Tu usuario es tu documento de identidad."
                     aria-label="Más información sobre el campo Usuario"
                   ></span>
                 </label>
@@ -211,6 +266,7 @@ $mensajeBienvenida = str_replace(
                   autocomplete="username"
                   required
                   autofocus
+                  value="<?php echo htmlspecialchars($usuarioForm, ENT_QUOTES, 'UTF-8'); ?>"
                 >
               </div>
 
@@ -221,9 +277,9 @@ $mensajeBienvenida = str_replace(
                     class="fa fa-info-circle info-icon"
                     tabindex="0"
                     role="button"
-                    data-bs-toggle="tooltip"
-                    data-bs-placement="right"
-                    data-bs-title="No compartas tu contraseña."
+                    data-toggle="tooltip"
+                    data-placement="right"
+                    title="No compartas tu contraseña."
                     aria-label="Más información sobre el campo Contraseña"
                   ></span>
                 </label>
@@ -247,12 +303,12 @@ $mensajeBienvenida = str_replace(
               </div>
 
               <div class="form-group">
-                <button class="form-control btn btn-primary rounded submit px-3" type="submit">
+                <button id="btn-login" class="form-control btn btn-primary rounded submit px-3" type="submit">
                   Ingresar
                 </button>
               </div>
 
-              <div class="form-group d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 mt-2 small">
+              <div class="form-group d-flex flex-column flex-md-row justify-content-between align-items-center mt-2 small">
                 <a
                   class="text-success text-decoration-none d-inline-flex align-items-center"
                   href="https://wa.me/51964881841?text=Hola%2C%20necesito%20apoyo%20del%20%C3%A1rea%20de%20Soporte."
@@ -260,7 +316,7 @@ $mensajeBienvenida = str_replace(
                   rel="noopener noreferrer"
                   title="Contactar a soporte por WhatsApp"
                 >
-                  <span class="fa fa-whatsapp me-1" aria-hidden="true"></span>
+                  <span class="fa fa-whatsapp mr-1" aria-hidden="true"></span>
                   Contactar a soporte
                 </a>
 
@@ -271,7 +327,7 @@ $mensajeBienvenida = str_replace(
                   rel="noopener noreferrer"
                   title="Solicitar recuperación de contraseña por WhatsApp"
                 >
-                  <span class="fa fa-unlock-alt me-1" aria-hidden="true"></span>
+                  <span class="fa fa-unlock-alt mr-1" aria-hidden="true"></span>
                   Recuperar contraseña
                 </a>
               </div>
@@ -292,32 +348,34 @@ $mensajeBienvenida = str_replace(
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="coverImageModalLabel">Vista de la imagen</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+          <span aria-hidden="true">&times;</span>
+        </button>
       </div>
       <div class="modal-body text-center">
         <img id="coverModalImage" src="" class="img-fluid rounded" alt="Vista ampliada">
       </div>
       <div class="modal-footer">
         <a id="coverModalDownload" class="btn btn-primary" href="#" download>Descargar imagen</a>
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
       </div>
     </div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="plugins/jquery/jquery.min.js"></script>
+<script src="plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script>
   (function () {
     var carouselEl = document.getElementById('loginCoverCarousel');
     if (!carouselEl) return;
 
-    var coverImages = carouselEl.querySelectorAll('.js-cover-image');
-    var carousel = bootstrap.Carousel.getOrCreateInstance(carouselEl, {
-      interval: 5000,
-      touch: false,
-      pause: false
-    });
+    var $carousel = window.jQuery ? window.jQuery(carouselEl) : null;
+    if ($carousel) {
+      $carousel.carousel({ interval: 5000, pause: false });
+    }
 
+    var coverImages = carouselEl.querySelectorAll('.js-cover-image');
     var startX = 0;
     var pointerDown = false;
     var dragMoved = false;
@@ -347,11 +405,11 @@ $mensajeBienvenida = str_replace(
       pointerDown = false;
       carouselEl.classList.remove('is-dragging');
 
-      if (Math.abs(diffX) >= dragThreshold) {
+      if (Math.abs(diffX) >= dragThreshold && $carousel) {
         if (diffX < 0) {
-          carousel.next();
+          $carousel.carousel('next');
         } else {
-          carousel.prev();
+          $carousel.carousel('prev');
         }
         suppressClick = true;
         setTimeout(function () {
@@ -408,20 +466,54 @@ $mensajeBienvenida = str_replace(
   })();
 
   (function () {
-    var triggers = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    triggers.forEach(function (el) {
-      new bootstrap.Tooltip(el, { trigger: 'hover focus' });
-    });
+    if (!window.jQuery) return;
+    window.jQuery('[data-toggle="tooltip"]').tooltip({ trigger: 'hover focus' });
   })();
 
   (function () {
     var form = document.getElementById('form-login');
-    var message = document.getElementById('login-message');
-    if (!form || !message) return;
+    var feedback = document.getElementById('login-feedback');
+    var btn = document.getElementById('btn-login');
+    if (!form || !feedback || !btn) return;
 
     form.addEventListener('submit', function (event) {
       event.preventDefault();
-      message.classList.remove('d-none');
+
+      if (form.checkValidity && !form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      feedback.classList.add('d-none');
+      feedback.textContent = '';
+      btn.disabled = true;
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', form.getAttribute('action') || 'login.php', true);
+      xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) return;
+
+        btn.disabled = false;
+
+        var response = null;
+        try {
+          response = JSON.parse(xhr.responseText);
+        } catch (e) {
+          response = null;
+        }
+
+        if (!response || response.ok !== true) {
+          var msg = (response && response.error) ? response.error : 'No se pudo iniciar sesión.';
+          feedback.textContent = msg;
+          feedback.classList.remove('d-none');
+          return;
+        }
+
+        window.location.href = response.redirect || 'inicio.php';
+      };
+
+      xhr.send(new FormData(form));
     });
   })();
 </script>
