@@ -103,6 +103,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $stCfg->execute([$inicializado, $userId]);
 
+            if (lsis_table_exists('lsis_configuracion_seguridad')) {
+                $stCfgSeg = db()->prepare(
+                    'INSERT INTO lsis_configuracion_seguridad
+                        (id, control_sesiones_activo, max_dispositivos_activo, max_dispositivos, timeout_inactividad_activo, timeout_inactividad_minutos, creado_en, actualizado_en)
+                     VALUES
+                        (1, 0, 0, 1, 0, 30, NOW(), NOW())
+                     ON DUPLICATE KEY UPDATE
+                        id = id'
+                );
+                $stCfgSeg->execute();
+            }
+
             db()->commit();
 
             if ($isAjax) {
