@@ -16,6 +16,7 @@ $setupError = '';
 $usuarioForm = '';
 $nombresForm = '';
 $apellidosForm = '';
+$csrfSetupToken = lsis_csrf_get_token('registro_inicial_form');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $usuario = trim((string) ($_POST['usuario'] ?? ''));
@@ -24,12 +25,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $clave = (string) ($_POST['clave'] ?? '');
     $claveConfirmar = (string) ($_POST['clave_confirmar'] ?? '');
     $claveInstalacion = trim((string) ($_POST['clave_instalacion'] ?? ''));
+    $csrfToken = (string) ($_POST['csrf_token'] ?? '');
 
     $usuarioForm = $usuario;
     $nombresForm = $nombres;
     $apellidosForm = $apellidos;
 
     $errores = [];
+    $setupAttemptReason = 'validacion';
+
+    if (!lsis_csrf_validate_token('registro_inicial_form', $csrfToken)) {
+        $errores[] = 'No se pudo completar el registro inicial.';
+        $setupAttemptReason = 'csrf';
+    }
+
+    $setupBlockMeta = [];
+    if (!$errores && lsis_security_is_setup_blocked($setupBlockMeta)) {
+        $errores[] = 'No se pudo completar el registro inicial.';
+        $setupAttemptReason = 'bloqueado';
+    }
 
     if (!lsis_can_run_initial_setup()) {
         $errores[] = 'El sistema ya fue inicializado.';
@@ -116,6 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             db()->commit();
+            lsis_security_record_attempt('registro_inicial', $usuario, 1, 'ok');
 
             if ($isAjax) {
                 header('Content-Type: application/json; charset=UTF-8');
@@ -129,11 +144,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (db()->inTransaction()) {
                 db()->rollBack();
             }
+            $setupAttemptReason = 'error';
             $errores[] = $e->getMessage() !== '' ? $e->getMessage() : 'No se pudo completar el registro inicial.';
         }
     }
 
     $setupError = implode(' ', $errores);
+    lsis_security_record_attempt('registro_inicial', $usuario, 0, $setupAttemptReason);
 
     if ($isAjax) {
         header('Content-Type: application/json; charset=UTF-8');
@@ -141,6 +158,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
+
+$csrfSetupToken = lsis_csrf_get_token('registro_inicial_form');
 ?>
 <!doctype html>
 <html lang="es">
@@ -186,6 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div id="setup-feedback" class="alert alert-danger py-2 mb-3 d-none" role="alert"></div>
 
             <form id="form-registro-inicial" action="registro_inicial.php" method="post" autocomplete="off" novalidate>
+              <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfSetupToken, ENT_QUOTES, 'UTF-8'); ?>">
               <div class="form-group">
                 <label for="usuario">Usuario (DNI/CE)</label>
                 <input id="usuario" type="text" name="usuario" class="form-control" maxlength="11" pattern="\d{8,11}" required value="<?php echo htmlspecialchars($usuarioForm, ENT_QUOTES, 'UTF-8'); ?>">

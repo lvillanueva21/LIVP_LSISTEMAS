@@ -30,25 +30,38 @@ if (isset($_GET['m']) && $_GET['m'] === 'logout') {
 }
 
 $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+$csrfLoginToken = lsis_csrf_get_token('login_form');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $usuarioForm = trim((string)($_POST['usuario'] ?? ''));
     $clave = (string)($_POST['clave'] ?? '');
+    $csrfToken = (string)($_POST['csrf_token'] ?? '');
 
-    $r = login($usuarioForm, $clave);
+    if (!lsis_csrf_validate_token('login_form', $csrfToken)) {
+        $err = 'No se pudo iniciar sesión.';
+        lsis_security_record_attempt('login', $usuarioForm, 0, 'csrf');
+    } else {
+        $loginBlockMeta = [];
+        if (lsis_security_is_login_blocked($usuarioForm, $loginBlockMeta)) {
+            $err = 'Usuario o contrasena incorrectos.';
+            lsis_security_record_attempt('login', $usuarioForm, 0, 'bloqueado');
+        } else {
+            $r = login($usuarioForm, $clave);
 
-    if ($r['ok']) {
-        if ($isAjax) {
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['ok' => true, 'redirect' => 'inicio.php']);
-            exit;
+            if ($r['ok']) {
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=UTF-8');
+                    echo json_encode(['ok' => true, 'redirect' => 'inicio.php']);
+                    exit;
+                }
+
+                header('Location: inicio.php');
+                exit;
+            }
+
+            $err = $r['error'] ?? 'No se pudo iniciar sesión.';
         }
-
-        header('Location: inicio.php');
-        exit;
     }
-
-    $err = $r['error'] ?? 'No se pudo iniciar sesión.';
 
     if ($isAjax) {
         header('Content-Type: application/json; charset=UTF-8');
@@ -56,6 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
+
+$csrfLoginToken = lsis_csrf_get_token('login_form');
 
 date_default_timezone_set('America/Lima');
 $hour = (int) date('G');
@@ -255,6 +270,7 @@ $mensajeBienvenida = str_replace(
             </div>
 
             <form id="form-login" action="login.php" method="post" class="signin-form" autocomplete="off" novalidate>
+              <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfLoginToken, ENT_QUOTES, 'UTF-8'); ?>">
               <div class="form-group mt-3">
                 <label for="usuario" class="form-label-fixed">
                   Usuario (DNI/CE)

@@ -5,6 +5,7 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
 }
 
 require_once __DIR__ . '/conexion.php';
+require_once __DIR__ . '/security.php';
 
 function start_secure_session()
 {
@@ -72,55 +73,12 @@ function lsis_auth_table_exists($tableName)
 
 function lsis_security_defaults()
 {
-    return [
-        'control_sesiones_activo' => 0,
-        'max_dispositivos_activo' => 0,
-        'max_dispositivos' => 1,
-        'timeout_inactividad_activo' => 0,
-        'timeout_inactividad_minutos' => 30,
-    ];
+    return lsis_security_policy_defaults();
 }
 
 function lsis_security_config()
 {
-    static $cache = null;
-
-    if ($cache !== null) {
-        return $cache;
-    }
-
-    $cfg = lsis_security_defaults();
-
-    if (!lsis_auth_table_exists('lsis_configuracion_seguridad')) {
-        $cache = $cfg;
-        return $cache;
-    }
-
-    try {
-        $st = db()->prepare("SELECT control_sesiones_activo, max_dispositivos_activo, max_dispositivos, timeout_inactividad_activo, timeout_inactividad_minutos FROM lsis_configuracion_seguridad WHERE id = 1 LIMIT 1");
-        $st->execute();
-        $row = $st->fetch();
-
-        if ($row) {
-            $cfg['control_sesiones_activo'] = (int) ($row['control_sesiones_activo'] ?? 0);
-            $cfg['max_dispositivos_activo'] = (int) ($row['max_dispositivos_activo'] ?? 0);
-            $cfg['max_dispositivos'] = (int) ($row['max_dispositivos'] ?? 1);
-            $cfg['timeout_inactividad_activo'] = (int) ($row['timeout_inactividad_activo'] ?? 0);
-            $cfg['timeout_inactividad_minutos'] = (int) ($row['timeout_inactividad_minutos'] ?? 30);
-        }
-    } catch (Throwable $e) {
-        $cfg = lsis_security_defaults();
-    }
-
-    if ($cfg['max_dispositivos'] < 1) {
-        $cfg['max_dispositivos'] = 1;
-    }
-    if ($cfg['timeout_inactividad_minutos'] < 1) {
-        $cfg['timeout_inactividad_minutos'] = 1;
-    }
-
-    $cache = $cfg;
-    return $cache;
+    return lsis_get_security_policy();
 }
 
 function lsis_client_ip()
@@ -326,6 +284,7 @@ function login($usuario, $clave)
     $clave = (string) $clave;
 
     if ($usuario === '' || $clave === '') {
+        lsis_security_record_attempt('login', $usuario, 0, 'datos_incompletos');
         return ['ok' => false, 'error' => 'Ingresa usuario y contrasena.'];
     }
 
@@ -335,14 +294,17 @@ function login($usuario, $clave)
     $row = $st->fetch();
 
     if (!$row) {
+        lsis_security_record_attempt('login', $usuario, 0, 'credenciales_invalidas');
         return ['ok' => false, 'error' => 'Usuario o contrasena incorrectos.'];
     }
 
     if ((int) $row['estado'] !== 1) {
+        lsis_security_record_attempt('login', $usuario, 0, 'usuario_inactivo');
         return ['ok' => false, 'error' => 'Usuario inactivo.'];
     }
 
     if (!password_verify($clave, $row['clave'])) {
+        lsis_security_record_attempt('login', $usuario, 0, 'credenciales_invalidas');
         return ['ok' => false, 'error' => 'Usuario o contrasena incorrectos.'];
     }
 
@@ -362,6 +324,7 @@ function login($usuario, $clave)
     $rolesRows = $stRoles->fetchAll();
 
     if (!$rolesRows) {
+        lsis_security_record_attempt('login', $usuario, 0, 'sin_roles');
         return ['ok' => false, 'error' => 'El usuario no tiene roles asignados.'];
     }
 
@@ -392,6 +355,8 @@ function login($usuario, $clave)
     } catch (Throwable $e) {
         // Mantener contrato funcional del login sin alterar respuesta visible.
     }
+
+    lsis_security_record_attempt('login', $usuario, 1, 'ok');
 
     return ['ok' => true];
 }
