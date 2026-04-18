@@ -36,22 +36,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $usuarioForm = trim((string)($_POST['usuario'] ?? ''));
     $clave = (string)($_POST['clave'] ?? '');
     $csrfToken = (string)($_POST['csrf_token'] ?? '');
+    $errorCode = '';
+    $retryAfterSeconds = null;
+    $retryAfterMinutes = null;
 
     if (!lsis_csrf_validate_token('login_form', $csrfToken)) {
         $err = 'No se pudo iniciar sesión.';
+        $errorCode = 'csrf';
         lsis_security_record_attempt('login', $usuarioForm, 0, 'csrf');
     } else {
         $loginBlockMeta = [];
         if (lsis_security_is_login_blocked($usuarioForm, $loginBlockMeta)) {
             $err = 'Usuario o contrasena incorrectos.';
+            $errorCode = 'bloqueado';
+
+            if (!empty($loginBlockMeta['blocked_until'])) {
+                $blockedUntilTs = strtotime((string) $loginBlockMeta['blocked_until']);
+                if ($blockedUntilTs !== false) {
+                    $secondsLeft = $blockedUntilTs - time();
+                    if ($secondsLeft > 0) {
+                        $retryAfterSeconds = $secondsLeft;
+                        $retryAfterMinutes = (int) ceil($secondsLeft / 60);
+                    }
+                }
+            }
+
             lsis_security_record_attempt('login', $usuarioForm, 0, 'bloqueado');
         } else {
             $r = login($usuarioForm, $clave);
+            $errorCode = (string) ($r['code'] ?? 'error_login');
 
             if ($r['ok']) {
                 if ($isAjax) {
                     header('Content-Type: application/json; charset=UTF-8');
-                    echo json_encode(['ok' => true, 'redirect' => 'inicio.php']);
+                    echo json_encode([
+                        'ok' => true,
+                        'redirect' => 'inicio.php',
+                        'code' => (string) ($r['code'] ?? 'ok'),
+                        'csrf_token_nuevo' => lsis_csrf_get_token('login_form'),
+                    ]);
                     exit;
                 }
 
@@ -65,7 +88,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($isAjax) {
         header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['ok' => false, 'error' => $err]);
+        echo json_encode([
+            'ok' => false,
+            'error' => $err,
+            'code' => $errorCode !== '' ? $errorCode : 'error_login',
+            'csrf_token_nuevo' => lsis_csrf_get_token('login_form'),
+            'retry_after_seconds' => $retryAfterSeconds,
+            'retry_after_minutes' => $retryAfterMinutes,
+        ]);
         exit;
     }
 }
@@ -532,6 +562,10 @@ $mensajeBienvenida = str_replace(
         }
 
         if (!response || response.ok !== true) {
+          if (response && response.csrf_token_nuevo) {
+            var csrfInputFail = form.querySelector('input[name="csrf_token"]');
+            if (csrfInputFail) csrfInputFail.value = response.csrf_token_nuevo;
+          }
           if (response && response.redirect) {
             window.location.href = response.redirect;
             return;
@@ -540,6 +574,11 @@ $mensajeBienvenida = str_replace(
           feedback.textContent = msg;
           feedback.classList.remove('d-none');
           return;
+        }
+
+        if (response && response.csrf_token_nuevo) {
+          var csrfInputOk = form.querySelector('input[name="csrf_token"]');
+          if (csrfInputOk) csrfInputOk.value = response.csrf_token_nuevo;
         }
 
         window.location.href = response.redirect || 'inicio.php';

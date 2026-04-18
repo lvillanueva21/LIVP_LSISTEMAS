@@ -285,7 +285,7 @@ function login($usuario, $clave)
 
     if ($usuario === '' || $clave === '') {
         lsis_security_record_attempt('login', $usuario, 0, 'datos_incompletos');
-        return ['ok' => false, 'error' => 'Ingresa usuario y contrasena.'];
+        return ['ok' => false, 'error' => 'Ingresa usuario y contrasena.', 'code' => 'datos_incompletos'];
     }
 
     $sql = "SELECT id, usuario, clave, nombres, apellidos, estado FROM lsis_usuarios WHERE usuario = ? LIMIT 1";
@@ -295,17 +295,17 @@ function login($usuario, $clave)
 
     if (!$row) {
         lsis_security_record_attempt('login', $usuario, 0, 'credenciales_invalidas');
-        return ['ok' => false, 'error' => 'Usuario o contrasena incorrectos.'];
+        return ['ok' => false, 'error' => 'Usuario o contrasena incorrectos.', 'code' => 'credenciales_invalidas'];
     }
 
     if ((int) $row['estado'] !== 1) {
         lsis_security_record_attempt('login', $usuario, 0, 'usuario_inactivo');
-        return ['ok' => false, 'error' => 'Usuario inactivo.'];
+        return ['ok' => false, 'error' => 'Usuario inactivo.', 'code' => 'usuario_inactivo'];
     }
 
     if (!password_verify($clave, $row['clave'])) {
         lsis_security_record_attempt('login', $usuario, 0, 'credenciales_invalidas');
-        return ['ok' => false, 'error' => 'Usuario o contrasena incorrectos.'];
+        return ['ok' => false, 'error' => 'Usuario o contrasena incorrectos.', 'code' => 'credenciales_invalidas'];
     }
 
     $sqlRoles = "
@@ -325,7 +325,7 @@ function login($usuario, $clave)
 
     if (!$rolesRows) {
         lsis_security_record_attempt('login', $usuario, 0, 'sin_roles');
-        return ['ok' => false, 'error' => 'El usuario no tiene roles asignados.'];
+        return ['ok' => false, 'error' => 'El usuario no tiene roles asignados.', 'code' => 'usuario_sin_roles'];
     }
 
     $roles = [];
@@ -358,7 +358,7 @@ function login($usuario, $clave)
 
     lsis_security_record_attempt('login', $usuario, 1, 'ok');
 
-    return ['ok' => true];
+    return ['ok' => true, 'code' => 'ok'];
 }
 
 function isAuthenticated()

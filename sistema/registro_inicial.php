@@ -26,6 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $claveConfirmar = (string) ($_POST['clave_confirmar'] ?? '');
     $claveInstalacion = trim((string) ($_POST['clave_instalacion'] ?? ''));
     $csrfToken = (string) ($_POST['csrf_token'] ?? '');
+    $setupResponseCode = '';
+    $retryAfterSeconds = null;
+    $retryAfterMinutes = null;
 
     $usuarioForm = $usuario;
     $nombresForm = $nombres;
@@ -37,12 +40,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!lsis_csrf_validate_token('registro_inicial_form', $csrfToken)) {
         $errores[] = 'No se pudo completar el registro inicial.';
         $setupAttemptReason = 'csrf';
+        $setupResponseCode = 'csrf';
     }
 
     $setupBlockMeta = [];
     if (!$errores && lsis_security_is_setup_blocked($setupBlockMeta)) {
         $errores[] = 'No se pudo completar el registro inicial.';
         $setupAttemptReason = 'bloqueado';
+        $setupResponseCode = 'bloqueado';
+
+        if (!empty($setupBlockMeta['blocked_until'])) {
+            $blockedUntilTs = strtotime((string) $setupBlockMeta['blocked_until']);
+            if ($blockedUntilTs !== false) {
+                $secondsLeft = $blockedUntilTs - time();
+                if ($secondsLeft > 0) {
+                    $retryAfterSeconds = $secondsLeft;
+                    $retryAfterMinutes = (int) ceil($secondsLeft / 60);
+                }
+            }
+        }
     }
 
     if (!lsis_can_run_initial_setup()) {
@@ -134,7 +150,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($isAjax) {
                 header('Content-Type: application/json; charset=UTF-8');
-                echo json_encode(['ok' => true, 'redirect' => 'login.php']);
+                echo json_encode([
+                    'ok' => true,
+                    'redirect' => 'login.php',
+                    'code' => 'ok',
+                    'csrf_token_nuevo' => lsis_csrf_get_token('registro_inicial_form'),
+                ]);
                 exit;
             }
 
@@ -145,7 +166,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 db()->rollBack();
             }
             $setupAttemptReason = 'error';
+            $setupResponseCode = 'error';
             $errores[] = $e->getMessage() !== '' ? $e->getMessage() : 'No se pudo completar el registro inicial.';
+        }
+    }
+
+    if ($setupResponseCode === '') {
+        if ($setupAttemptReason === 'validacion') {
+            $setupResponseCode = 'validacion';
+        } else {
+            $setupResponseCode = $setupAttemptReason;
         }
     }
 
@@ -154,7 +184,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($isAjax) {
         header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['ok' => false, 'error' => $setupError]);
+        echo json_encode([
+            'ok' => false,
+            'error' => $setupError,
+            'code' => $setupResponseCode !== '' ? $setupResponseCode : 'error',
+            'csrf_token_nuevo' => lsis_csrf_get_token('registro_inicial_form'),
+            'retry_after_seconds' => $retryAfterSeconds,
+            'retry_after_minutes' => $retryAfterMinutes,
+        ]);
         exit;
     }
 }
@@ -292,11 +329,19 @@ $csrfSetupToken = lsis_csrf_get_token('registro_inicial_form');
         }
 
         if (!response || response.ok !== true) {
+          if (response && response.csrf_token_nuevo) {
+            var csrfInputFail = form.querySelector('input[name="csrf_token"]');
+            if (csrfInputFail) csrfInputFail.value = response.csrf_token_nuevo;
+          }
           feedback.textContent = (response && response.error) ? response.error : 'No se pudo completar el registro inicial.';
           feedback.classList.remove('d-none');
           return;
         }
 
+        if (response && response.csrf_token_nuevo) {
+          var csrfInputOk = form.querySelector('input[name="csrf_token"]');
+          if (csrfInputOk) csrfInputOk.value = response.csrf_token_nuevo;
+        }
         window.location.href = response.redirect || 'login.php';
       };
 
