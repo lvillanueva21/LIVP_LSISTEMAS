@@ -10,18 +10,20 @@ if (!empty($cfg['app']['timezone'])) {
     date_default_timezone_set($cfg['app']['timezone']);
 }
 
-mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-
 try {
-    $mysqli = new mysqli(
+    $dsn = sprintf(
+        'mysql:host=%s;port=%d;dbname=%s;charset=%s',
         $cfg['db']['host'],
-        $cfg['db']['user'],
-        $cfg['db']['pass'],
+        (int) $cfg['db']['port'],
         $cfg['db']['name'],
-        (int) $cfg['db']['port']
+        $cfg['db']['charset']
     );
 
-    $mysqli->set_charset($cfg['db']['charset']);
+    $pdo = new PDO($dsn, $cfg['db']['user'], $cfg['db']['pass'], [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ]);
 } catch (Throwable $e) {
     http_response_code(500);
     exit('Error de conexion a la base de datos.');
@@ -29,6 +31,6 @@ try {
 
 function db()
 {
-    global $mysqli;
-    return $mysqli;
+    global $pdo;
+    return $pdo;
 }

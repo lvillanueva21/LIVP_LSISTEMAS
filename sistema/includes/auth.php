@@ -50,10 +50,8 @@ function login($usuario, $clave)
 
     $sql = "SELECT id, usuario, clave, nombres, apellidos, estado FROM lsis_usuarios WHERE usuario = ? LIMIT 1";
     $st = db()->prepare($sql);
-    $st->bind_param('s', $usuario);
-    $st->execute();
-    $row = $st->get_result()->fetch_assoc();
-    $st->close();
+    $st->execute([$usuario]);
+    $row = $st->fetch();
 
     if (!$row) {
         return ['ok' => false, 'error' => 'Usuario o contrasena incorrectos.'];
@@ -77,12 +75,10 @@ function login($usuario, $clave)
         ORDER BY r.id ASC
     ";
 
-    $stRoles = db()->prepare($sqlRoles);
     $uid = (int) $row['id'];
-    $stRoles->bind_param('i', $uid);
-    $stRoles->execute();
-    $rolesRows = $stRoles->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stRoles->close();
+    $stRoles = db()->prepare($sqlRoles);
+    $stRoles->execute([$uid]);
+    $rolesRows = $stRoles->fetchAll();
 
     if (!$rolesRows) {
         return ['ok' => false, 'error' => 'El usuario no tiene roles asignados.'];

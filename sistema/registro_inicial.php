@@ -62,13 +62,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errores) {
-        db()->begin_transaction();
+        db()->beginTransaction();
         try {
             $stUser = db()->prepare('SELECT id FROM lsis_usuarios WHERE usuario = ? LIMIT 1');
-            $stUser->bind_param('s', $usuario);
-            $stUser->execute();
-            $existe = $stUser->get_result()->fetch_assoc();
-            $stUser->close();
+            $stUser->execute([$usuario]);
+            $existe = $stUser->fetch();
 
             if ($existe) {
                 throw new Exception('El usuario ya existe.');
@@ -79,25 +77,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $estadoRol = 1;
                 $nombreRol = 'Superadmin';
                 $stRole = db()->prepare('INSERT INTO lsis_roles (nombre, estado) VALUES (?, ?)');
-                $stRole->bind_param('si', $nombreRol, $estadoRol);
-                $stRole->execute();
-                $roleId = (int) db()->insert_id;
-                $stRole->close();
+                $stRole->execute([$nombreRol, $estadoRol]);
+                $roleId = (int) db()->lastInsertId();
             }
 
             $hash = password_hash($clave, PASSWORD_BCRYPT);
             $estadoUsuario = 1;
             $stInsertUser = db()->prepare('INSERT INTO lsis_usuarios (usuario, clave, nombres, apellidos, estado) VALUES (?, ?, ?, ?, ?)');
-            $stInsertUser->bind_param('ssssi', $usuario, $hash, $nombres, $apellidos, $estadoUsuario);
-            $stInsertUser->execute();
-            $userId = (int) db()->insert_id;
-            $stInsertUser->close();
+            $stInsertUser->execute([$usuario, $hash, $nombres, $apellidos, $estadoUsuario]);
+            $userId = (int) db()->lastInsertId();
 
             $estadoRolUsuario = 1;
             $stInsertUR = db()->prepare('INSERT INTO lsis_usuario_roles (id_usuario, id_rol, estado) VALUES (?, ?, ?)');
-            $stInsertUR->bind_param('iii', $userId, $roleId, $estadoRolUsuario);
-            $stInsertUR->execute();
-            $stInsertUR->close();
+            $stInsertUR->execute([$userId, $roleId, $estadoRolUsuario]);
 
             $inicializado = 1;
             $stCfg = db()->prepare(
@@ -109,9 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     fecha_inicializacion = VALUES(fecha_inicializacion),
                     actualizado_en = NOW()'
             );
-            $stCfg->bind_param('ii', $inicializado, $userId);
-            $stCfg->execute();
-            $stCfg->close();
+            $stCfg->execute([$inicializado, $userId]);
 
             db()->commit();
 
@@ -124,7 +114,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: login.php');
             exit;
         } catch (Throwable $e) {
-            db()->rollback();
+            if (db()->inTransaction()) {
+                db()->rollBack();
+            }
             $errores[] = $e->getMessage() !== '' ? $e->getMessage() : 'No se pudo completar el registro inicial.';
         }
     }

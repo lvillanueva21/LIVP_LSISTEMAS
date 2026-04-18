@@ -15,10 +15,8 @@ function lsis_table_exists($tableName)
           AND table_name = ?
     ";
     $st = db()->prepare($sql);
-    $st->bind_param('s', $tableName);
-    $st->execute();
-    $row = $st->get_result()->fetch_assoc();
-    $st->close();
+    $st->execute([$tableName]);
+    $row = $st->fetch();
 
     return !empty($row['c']);
 }
@@ -31,7 +29,7 @@ function lsis_get_superadmin_role_id()
 
     $sql = "SELECT id FROM lsis_roles WHERE nombre = 'Superadmin' LIMIT 1";
     $res = db()->query($sql);
-    $row = $res ? $res->fetch_assoc() : null;
+    $row = $res ? $res->fetch() : null;
 
     return $row ? (int) $row['id'] : 0;
 }
@@ -53,7 +51,7 @@ function lsis_superadmin_exists()
           AND r.estado = 1
     ";
     $res = db()->query($sql);
-    $row = $res ? $res->fetch_assoc() : null;
+    $row = $res ? $res->fetch() : null;
 
     return !empty($row['c']);
 }
@@ -71,7 +69,7 @@ function lsis_config_table_initialized()
         LIMIT 1
     ";
     $res = db()->query($sql);
-    $row = $res ? $res->fetch_assoc() : null;
+    $row = $res ? $res->fetch() : null;
 
     return $row && (int) $row['sistema_inicializado'] === 1;
 }
@@ -89,4 +87,3 @@ function lsis_can_run_initial_setup()
 {
     return !lsis_is_initialized();
 }
-
