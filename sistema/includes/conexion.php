@@ -9,7 +9,7 @@ $localConfigPath = __DIR__ . '/config.local.php';
 
 if (!is_file($localConfigPath)) {
     http_response_code(500);
-    exit('Archivo de configuracion local no encontrado.');
+    exit('Archivo de configuracion local no encontrado. Copia config.example.php como config.local.php en sistema/includes/.');
 }
 
 $dbHost = trim((string) ($cfg['db']['host'] ?? ''));
@@ -21,7 +21,7 @@ $dbCharset = trim((string) ($cfg['db']['charset'] ?? 'utf8mb4'));
 
 if ($dbHost === '' || $dbName === '' || $dbUser === '' || $dbPass === '') {
     http_response_code(500);
-    exit('Configuracion de base de datos incompleta en config.local.php.');
+    exit('Configuracion de base de datos incompleta en config.local.php. Verifica host, name, user y pass.');
 }
 
 if ($dbPort <= 0) {
@@ -62,7 +62,7 @@ try {
     }
 } catch (Throwable $e) {
     http_response_code(500);
-    exit('Error de conexion a la base de datos.');
+    exit('Error de conexion a la base de datos. Verifica credenciales y acceso del servidor MySQL.');
 }
 
 function db()

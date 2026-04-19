@@ -15,5 +15,6 @@ Options -Indexes
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    RewriteRule ^includes/ - [F,L,NC]
     RewriteRule ^(?:logs?|backups?)/ - [F,L,NC]
 </IfModule>
