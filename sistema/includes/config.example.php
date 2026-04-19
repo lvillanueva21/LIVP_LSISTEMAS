@@ -4,6 +4,9 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
     exit('Acceso directo no permitido.');
 }
 
+// Copia este archivo como config.local.php en esta misma carpeta.
+// No subas config.local.php al repositorio.
+
 return [
     'db' => [
         'host'    => 'localhost',

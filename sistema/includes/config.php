@@ -41,32 +41,4 @@ if (is_file($localConfigPath)) {
     }
 }
 
-$envMap = [
-    'db.host' => getenv('LSIS_DB_HOST'),
-    'db.name' => getenv('LSIS_DB_NAME'),
-    'db.user' => getenv('LSIS_DB_USER'),
-    'db.pass' => getenv('LSIS_DB_PASS'),
-    'db.port' => getenv('LSIS_DB_PORT'),
-    'app.install_key' => getenv('LSIS_INSTALL_KEY'),
-];
-
-foreach ($envMap as $path => $envValue) {
-    if ($envValue === false || $envValue === '') {
-        continue;
-    }
-
-    if ($path === 'db.port') {
-        $config['db']['port'] = (int) $envValue;
-        if ($config['db']['port'] <= 0) {
-            $config['db']['port'] = 3306;
-        }
-        continue;
-    }
-
-    $parts = explode('.', $path, 2);
-    if (count($parts) === 2) {
-        $config[$parts[0]][$parts[1]] = $envValue;
-    }
-}
-
 return $config;

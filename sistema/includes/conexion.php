@@ -5,6 +5,12 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
 }
 
 $cfg = require __DIR__ . '/config.php';
+$localConfigPath = __DIR__ . '/config.local.php';
+
+if (!is_file($localConfigPath)) {
+    http_response_code(500);
+    exit('Archivo de configuracion local no encontrado.');
+}
 
 $dbHost = trim((string) ($cfg['db']['host'] ?? ''));
 $dbName = trim((string) ($cfg['db']['name'] ?? ''));
@@ -15,7 +21,7 @@ $dbCharset = trim((string) ($cfg['db']['charset'] ?? 'utf8mb4'));
 
 if ($dbHost === '' || $dbName === '' || $dbUser === '' || $dbPass === '') {
     http_response_code(500);
-    exit('Configuracion de base de datos incompleta.');
+    exit('Configuracion de base de datos incompleta en config.local.php.');
 }
 
 if ($dbPort <= 0) {

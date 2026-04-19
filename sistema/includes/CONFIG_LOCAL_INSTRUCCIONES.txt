@@ -1,0 +1,4 @@
+1) Copia config.example.php como config.local.php en esta misma carpeta.
+2) Completa tus credenciales reales de BD e install_key en config.local.php.
+3) No subas config.local.php al repositorio.
+4) En hosting compartido, este archivo debe existir para que el sistema levante.
