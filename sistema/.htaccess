@@ -1,4 +1,6 @@
-Options -Indexes
+<IfModule mod_autoindex.c>
+    IndexIgnore *
+</IfModule>
 
 <IfModule mod_authz_core.c>
     <FilesMatch "(?i)\.(sql|bak|backup|old|log|ini|env)$">

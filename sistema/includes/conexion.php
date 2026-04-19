@@ -4,13 +4,22 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
     exit('Acceso directo no permitido.');
 }
 
+function lsis_bootstrap_fail($publicMessage, $logMessage = '')
+{
+    if ($logMessage !== '') {
+        error_log('[conexion] ' . $logMessage);
+    }
+
+    if (!headers_sent()) {
+        header('Content-Type: text/plain; charset=UTF-8');
+    }
+
+    exit($publicMessage);
+}
+
 $cfg = require __DIR__ . '/config.php';
 $localConfigPath = __DIR__ . '/config.local.php';
-
-if (!is_file($localConfigPath)) {
-    http_response_code(500);
-    exit('Archivo de configuracion local no encontrado. Copia config.example.php como config.local.php en sistema/includes/.');
-}
+$localConfigExists = is_file($localConfigPath);
 
 $dbHost = trim((string) ($cfg['db']['host'] ?? ''));
 $dbName = trim((string) ($cfg['db']['name'] ?? ''));
@@ -20,8 +29,10 @@ $dbPort = (int) ($cfg['db']['port'] ?? 3306);
 $dbCharset = trim((string) ($cfg['db']['charset'] ?? 'utf8mb4'));
 
 if ($dbHost === '' || $dbName === '' || $dbUser === '' || $dbPass === '') {
-    http_response_code(500);
-    exit('Configuracion de base de datos incompleta en config.local.php. Verifica host, name, user y pass.');
+    $extra = $localConfigExists
+        ? 'Revisa host, name, user y pass en sistema/includes/config.local.php.'
+        : 'No se encontro sistema/includes/config.local.php. Copia config.example.php como config.local.php y completa credenciales.';
+    lsis_bootstrap_fail('Configuracion de base de datos incompleta. ' . $extra, 'Datos DB incompletos.');
 }
 
 if ($dbPort <= 0) {
@@ -61,8 +72,10 @@ try {
         }
     }
 } catch (Throwable $e) {
-    http_response_code(500);
-    exit('Error de conexion a la base de datos. Verifica credenciales y acceso del servidor MySQL.');
+    lsis_bootstrap_fail(
+        'Error de conexion a la base de datos. Verifica credenciales y acceso del servidor MySQL.',
+        $e->getMessage()
+    );
 }
 
 function db()

@@ -1,4 +1,6 @@
-Options -Indexes
+<IfModule mod_autoindex.c>
+    IndexIgnore *
+</IfModule>
 
 <IfModule mod_authz_core.c>
     Require all denied
