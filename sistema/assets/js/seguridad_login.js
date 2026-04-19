@@ -237,6 +237,35 @@
     });
   }
 
+  app.addEventListener('click', function (event) {
+    var trigger = event.target.closest('[data-slg-info-target]');
+    if (!trigger) return;
+
+    event.preventDefault();
+    var targetId = trigger.getAttribute('data-slg-info-target') || '';
+    if (!targetId) return;
+
+    var target = document.getElementById(targetId);
+    if (!target) return;
+
+    var isOpen = !target.classList.contains('d-none');
+
+    var tips = app.querySelectorAll('.slg-info-tip');
+    for (var i = 0; i < tips.length; i++) {
+      tips[i].classList.add('d-none');
+    }
+
+    var triggers = app.querySelectorAll('[data-slg-info-target]');
+    for (var j = 0; j < triggers.length; j++) {
+      triggers[j].setAttribute('aria-expanded', 'false');
+    }
+
+    if (!isOpen) {
+      target.classList.remove('d-none');
+      trigger.setAttribute('aria-expanded', 'true');
+    }
+  });
+
   form.addEventListener('submit', function (event) {
     event.preventDefault();
     saveConfig();
