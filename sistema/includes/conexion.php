@@ -83,3 +83,40 @@ function db()
     global $pdo;
     return $pdo;
 }
+
+function lsis_table_exists_cached($tableName)
+{
+    static $cache = [];
+
+    $tableName = trim((string) $tableName);
+    if ($tableName === '') {
+        return false;
+    }
+
+    if (array_key_exists($tableName, $cache)) {
+        return $cache[$tableName];
+    }
+
+    try {
+        $sql = "
+            SELECT COUNT(*) AS c
+            FROM information_schema.tables
+            WHERE table_schema = DATABASE()
+              AND table_name = ?
+        ";
+        $st = db()->prepare($sql);
+        $st->execute([$tableName]);
+        $row = $st->fetch();
+        $cache[$tableName] = !empty($row['c']);
+    } catch (Throwable $e) {
+        $cache[$tableName] = false;
+    }
+
+    return $cache[$tableName];
+}
+
+function lsis_get_config()
+{
+    global $cfg;
+    return is_array($cfg) ? $cfg : [];
+}

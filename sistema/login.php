@@ -325,10 +325,6 @@ $mensajeBienvenida = str_replace(
 
             <div id="login-feedback" class="alert alert-danger py-2 mb-3 d-none" role="alert"></div>
 
-            <div id="login-message" class="alert alert-info py-2 mb-3 d-none" role="alert">
-              Esta pantalla es solo de presentación visual. La autenticación aún no está implementada.
-            </div>
-
             <form id="form-login" action="login.php" method="post" class="signin-form" autocomplete="off" novalidate>
               <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfLoginToken, ENT_QUOTES, 'UTF-8'); ?>">
               <div class="form-group mt-3">

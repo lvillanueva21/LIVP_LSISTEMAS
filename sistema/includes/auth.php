@@ -9,11 +9,15 @@ require_once __DIR__ . '/security.php';
 
 function start_secure_session()
 {
+    if (PHP_SAPI === 'cli') {
+        return;
+    }
+
     if (session_status() === PHP_SESSION_ACTIVE) {
         return;
     }
 
-    $cfg = require __DIR__ . '/config.php';
+    $cfg = lsis_get_config();
     $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
 
     if (!empty($cfg['app']['session_name'])) {
@@ -42,43 +46,99 @@ start_secure_session();
 
 function lsis_auth_table_exists($tableName)
 {
-    static $cache = [];
-
-    $tableName = trim((string) $tableName);
-    if ($tableName === '') {
-        return false;
-    }
-
-    if (array_key_exists($tableName, $cache)) {
-        return $cache[$tableName];
-    }
-
-    try {
-        $sql = "
-            SELECT COUNT(*) AS c
-            FROM information_schema.tables
-            WHERE table_schema = DATABASE()
-              AND table_name = ?
-        ";
-        $st = db()->prepare($sql);
-        $st->execute([$tableName]);
-        $row = $st->fetch();
-        $cache[$tableName] = !empty($row['c']);
-    } catch (Throwable $e) {
-        $cache[$tableName] = false;
-    }
-
-    return $cache[$tableName];
-}
-
-function lsis_security_defaults()
-{
-    return lsis_security_policy_defaults();
+    return lsis_table_exists_cached($tableName);
 }
 
 function lsis_security_config()
 {
     return lsis_get_security_policy();
+}
+
+function lsis_auth_is_superadmin_user_id($userId)
+{
+    $userId = (int) $userId;
+    if ($userId <= 0) {
+        return false;
+    }
+
+    if (
+        !lsis_auth_table_exists('lsis_usuarios')
+        || !lsis_auth_table_exists('lsis_roles')
+        || !lsis_auth_table_exists('lsis_usuario_roles')
+    ) {
+        return false;
+    }
+
+    $sql = "
+        SELECT COUNT(*) AS c
+        FROM lsis_usuarios u
+        INNER JOIN lsis_usuario_roles ur ON ur.id_usuario = u.id
+        INNER JOIN lsis_roles r ON r.id = ur.id_rol
+        WHERE u.id = ?
+          AND u.estado = 1
+          AND ur.estado = 1
+          AND r.estado = 1
+          AND r.nombre = 'Superadmin'
+    ";
+    $st = db()->prepare($sql);
+    $st->execute([$userId]);
+    $row = $st->fetch();
+
+    return !empty($row['c']);
+}
+
+function lsis_auth_admin_context_ok($actorAdminId, &$meta = null, array $options = [])
+{
+    $defaults = [
+        'allow_system_actor' => false,
+        'require_session_match' => (PHP_SAPI !== 'cli'),
+        'require_superadmin' => true,
+        'context' => 'admin_operation',
+    ];
+    $opts = array_merge($defaults, $options);
+
+    $actorAdminId = (int) $actorAdminId;
+    $meta = [
+        'ok' => false,
+        'reason' => '',
+        'actor_admin_id' => $actorAdminId,
+        'context' => (string) $opts['context'],
+        'system_actor' => false,
+    ];
+
+    if ($actorAdminId <= 0) {
+        if (!empty($opts['allow_system_actor']) && $actorAdminId === 0) {
+            $meta['ok'] = true;
+            $meta['reason'] = 'system_actor';
+            $meta['system_actor'] = true;
+            return true;
+        }
+
+        $meta['reason'] = 'actor_admin_invalido';
+        return false;
+    }
+
+    if (!empty($opts['require_session_match'])) {
+        if (!isAuthenticated()) {
+            $meta['reason'] = 'sesion_admin_requerida';
+            return false;
+        }
+
+        $sessionUserId = (int) ($_SESSION['user']['id'] ?? 0);
+        if ($sessionUserId <= 0 || $sessionUserId !== $actorAdminId) {
+            $meta['reason'] = 'actor_admin_no_coincide_con_sesion';
+            return false;
+        }
+    }
+
+    if (!empty($opts['require_superadmin']) && !lsis_auth_is_superadmin_user_id($actorAdminId)) {
+        $meta['reason'] = 'actor_admin_no_superadmin';
+        return false;
+    }
+
+    $meta['ok'] = true;
+    $meta['reason'] = 'ok';
+    return true;
 }
 
 function lsis_client_ip()
@@ -121,7 +181,7 @@ function lsis_normalize_close_reason($motivo)
 function lsis_close_active_sessions_by_ids(array $ids, $motivo)
 {
     if (!$ids || !lsis_auth_table_exists('lsis_sesiones')) {
-        return;
+        return 0;
     }
 
     $motivo = lsis_normalize_close_reason($motivo);
@@ -130,7 +190,7 @@ function lsis_close_active_sessions_by_ids(array $ids, $motivo)
     }));
 
     if (!$ids) {
-        return;
+        return 0;
     }
 
     $marks = implode(',', array_fill(0, count($ids), '?'));
@@ -147,6 +207,7 @@ function lsis_close_active_sessions_by_ids(array $ids, $motivo)
     $params = array_merge([$motivo], $ids);
     $st = db()->prepare($sql);
     $st->execute($params);
+    return (int) $st->rowCount();
 }
 
 function lsis_close_current_session_db($motivo)

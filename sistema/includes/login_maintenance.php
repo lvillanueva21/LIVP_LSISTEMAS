@@ -83,7 +83,6 @@ function lsis_maintenance_current_session_hash()
 
 function lsis_admin_close_session_by_id($sessionId, $actorAdminId, $allowSelfClose = false)
 {
-    $defaults = lsis_maintenance_defaults();
     $sessionId = (int) $sessionId;
     $actorAdminId = (int) $actorAdminId;
     $allowSelfClose = (bool) $allowSelfClose;
@@ -102,6 +101,19 @@ function lsis_admin_close_session_by_id($sessionId, $actorAdminId, $allowSelfClo
     if (!lsis_auth_table_exists('lsis_sesiones')) {
         $result['code'] = 'tabla_no_disponible';
         $result['message'] = 'Tabla de sesiones no disponible.';
+        return $result;
+    }
+
+    $adminMeta = [];
+    if (!lsis_auth_admin_context_ok($actorAdminId, $adminMeta, ['context' => 'admin_close_session'])) {
+        $result['code'] = 'contexto_admin_invalido';
+        $result['message'] = 'Contexto administrativo invalido.';
+        lsis_maintenance_log('admin_close_session', [
+            'actor_admin_id' => $actorAdminId,
+            'session_id' => $sessionId,
+            'status' => 'invalid_admin_context',
+            'reason' => (string) ($adminMeta['reason'] ?? ''),
+        ]);
         return $result;
     }
 
@@ -222,6 +234,19 @@ function lsis_admin_close_user_sessions($targetUserId, $actorAdminId, $allowSelf
         return $result;
     }
 
+    $adminMeta = [];
+    if (!lsis_auth_admin_context_ok($actorAdminId, $adminMeta, ['context' => 'admin_close_user_sessions'])) {
+        $result['code'] = 'contexto_admin_invalido';
+        $result['message'] = 'Contexto administrativo invalido.';
+        lsis_maintenance_log('admin_close_user_sessions', [
+            'actor_admin_id' => $actorAdminId,
+            'target_user_id' => $targetUserId,
+            'status' => 'invalid_admin_context',
+            'reason' => (string) ($adminMeta['reason'] ?? ''),
+        ]);
+        return $result;
+    }
+
     if ($targetUserId <= 0) {
         $result['code'] = 'parametro_invalido';
         $result['message'] = 'Usuario invalido.';
@@ -279,13 +304,11 @@ function lsis_admin_close_user_sessions($targetUserId, $actorAdminId, $allowSelf
             return $result;
         }
 
-        lsis_close_active_sessions_by_ids($idsToClose, 'forzada_admin');
-
-        $affected = count($idsToClose);
+        $affected = (int) lsis_close_active_sessions_by_ids($idsToClose, 'forzada_admin');
         $result['ok'] = true;
-        $result['code'] = 'ok';
+        $result['code'] = $affected > 0 ? 'ok' : 'sin_cambios';
         $result['affected'] = $affected;
-        $result['message'] = 'Sesiones cerradas por admin.';
+        $result['message'] = $affected > 0 ? 'Sesiones cerradas por admin.' : 'No hubo cambios al cerrar sesiones.';
 
         lsis_maintenance_log('admin_close_user_sessions', [
             'actor_admin_id' => $actorAdminId,
@@ -356,6 +379,21 @@ function lsis_maintenance_cleanup_closed_sessions($actorAdminId = 0, $retentionD
 
     if (!lsis_auth_table_exists('lsis_sesiones')) {
         $result['code'] = 'tabla_no_disponible';
+        return $result;
+    }
+
+    $adminMeta = [];
+    if (!lsis_auth_admin_context_ok($actorAdminId, $adminMeta, [
+        'allow_system_actor' => (PHP_SAPI === 'cli'),
+        'require_session_match' => (PHP_SAPI !== 'cli'),
+        'context' => 'maintenance_cleanup_sesiones',
+    ])) {
+        $result['code'] = 'contexto_admin_invalido';
+        lsis_maintenance_log('cleanup_sesiones', [
+            'actor_admin_id' => $actorAdminId,
+            'status' => 'invalid_admin_context',
+            'reason' => (string) ($adminMeta['reason'] ?? ''),
+        ]);
         return $result;
     }
 
@@ -438,6 +476,21 @@ function lsis_maintenance_cleanup_old_attempts($actorAdminId = 0, $retentionDays
         return $result;
     }
 
+    $adminMeta = [];
+    if (!lsis_auth_admin_context_ok($actorAdminId, $adminMeta, [
+        'allow_system_actor' => (PHP_SAPI === 'cli'),
+        'require_session_match' => (PHP_SAPI !== 'cli'),
+        'context' => 'maintenance_cleanup_intentos',
+    ])) {
+        $result['code'] = 'contexto_admin_invalido';
+        lsis_maintenance_log('cleanup_intentos', [
+            'actor_admin_id' => $actorAdminId,
+            'status' => 'invalid_admin_context',
+            'reason' => (string) ($adminMeta['reason'] ?? ''),
+        ]);
+        return $result;
+    }
+
     $countSql = "
         SELECT COUNT(*) AS c
         FROM lsis_intentos_acceso
@@ -512,6 +565,21 @@ function lsis_maintenance_cleanup_old_login_blocks($actorAdminId = 0, $retention
 
     if (!lsis_security_table_exists('lsis_bloqueos_login')) {
         $result['code'] = 'tabla_no_disponible';
+        return $result;
+    }
+
+    $adminMeta = [];
+    if (!lsis_auth_admin_context_ok($actorAdminId, $adminMeta, [
+        'allow_system_actor' => (PHP_SAPI === 'cli'),
+        'require_session_match' => (PHP_SAPI !== 'cli'),
+        'context' => 'maintenance_cleanup_bloqueos',
+    ])) {
+        $result['code'] = 'contexto_admin_invalido';
+        lsis_maintenance_log('cleanup_bloqueos', [
+            'actor_admin_id' => $actorAdminId,
+            'status' => 'invalid_admin_context',
+            'reason' => (string) ($adminMeta['reason'] ?? ''),
+        ]);
         return $result;
     }
 

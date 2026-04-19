@@ -8,33 +8,7 @@ require_once __DIR__ . '/conexion.php';
 
 function lsis_security_table_exists($tableName)
 {
-    static $cache = [];
-
-    $tableName = trim((string) $tableName);
-    if ($tableName === '') {
-        return false;
-    }
-
-    if (array_key_exists($tableName, $cache)) {
-        return $cache[$tableName];
-    }
-
-    try {
-        $sql = "
-            SELECT COUNT(*) AS c
-            FROM information_schema.tables
-            WHERE table_schema = DATABASE()
-              AND table_name = ?
-        ";
-        $st = db()->prepare($sql);
-        $st->execute([$tableName]);
-        $row = $st->fetch();
-        $cache[$tableName] = !empty($row['c']);
-    } catch (Throwable $e) {
-        $cache[$tableName] = false;
-    }
-
-    return $cache[$tableName];
+    return lsis_table_exists_cached($tableName);
 }
 
 function lsis_security_policy_defaults()
