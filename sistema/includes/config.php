@@ -4,17 +4,19 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
     exit('Acceso directo no permitido.');
 }
 
-function lsis_config_merge(array $base, array $extra)
-{
-    foreach ($extra as $key => $value) {
-        if (is_array($value) && isset($base[$key]) && is_array($base[$key])) {
-            $base[$key] = lsis_config_merge($base[$key], $value);
-        } else {
-            $base[$key] = $value;
+if (!function_exists('lsis_config_merge')) {
+    function lsis_config_merge(array $base, array $extra)
+    {
+        foreach ($extra as $key => $value) {
+            if (is_array($value) && isset($base[$key]) && is_array($base[$key])) {
+                $base[$key] = lsis_config_merge($base[$key], $value);
+            } else {
+                $base[$key] = $value;
+            }
         }
-    }
 
-    return $base;
+        return $base;
+    }
 }
 
 $config = [
