@@ -7,6 +7,7 @@ if ($nombreCompleto === '') {
     $nombreCompleto = $u['usuario'] ?? 'Usuario';
 }
 $rolActivo = $u['rol_activo'] ?? 'Sin rol';
+$csrfLogoutToken = lsis_csrf_get_token('logout_form');
 ?>
 <!doctype html>
 <html lang="es">
@@ -42,11 +43,15 @@ $rolActivo = $u['rol_activo'] ?? 'Sin rol';
         </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link text-danger" href="logout.php" title="Salir">
+        <a class="nav-link text-danger" href="#" title="Salir" onclick="event.preventDefault(); var f = document.getElementById('form-logout'); if (f) { f.submit(); }">
           <i class="fas fa-sign-out-alt"></i>
         </a>
       </li>
     </ul>
   </nav>
+
+  <form id="form-logout" method="post" action="logout.php" class="d-none">
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfLogoutToken, ENT_QUOTES, 'UTF-8'); ?>">
+  </form>
 
   <?php include __DIR__ . '/sidebar.php'; ?>

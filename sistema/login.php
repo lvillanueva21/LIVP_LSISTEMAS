@@ -45,47 +45,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errorCode = 'csrf';
         lsis_security_record_attempt('login', $usuarioForm, 0, 'csrf');
     } else {
-        $loginBlockMeta = [];
-        if (lsis_security_is_login_blocked($usuarioForm, $loginBlockMeta)) {
-            $err = 'Usuario o contrasena incorrectos.';
-            $errorCode = 'bloqueado';
-
-            if (!empty($loginBlockMeta['blocked_until'])) {
-                $blockedUntilTs = strtotime((string) $loginBlockMeta['blocked_until']);
-                if ($blockedUntilTs !== false) {
-                    $secondsLeft = $blockedUntilTs - time();
-                    if ($secondsLeft > 0) {
-                        $retryAfterSeconds = $secondsLeft;
-                        $retryAfterMinutes = (int) ceil($secondsLeft / 60);
-                    }
-                }
-            }
-
-            lsis_security_record_attempt('login', $usuarioForm, 0, 'bloqueado');
+        $loginDepsMeta = [];
+        if (!lsis_security_login_dependencies_ok($loginDepsMeta)) {
+            $err = 'No se pudo iniciar sesión.';
+            $errorCode = 'seguridad_incompleta';
+            lsis_security_record_attempt('login', $usuarioForm, 0, 'seguridad_incompleta');
         } else {
-            $r = login($usuarioForm, $clave);
-            $errorCode = (string) ($r['code'] ?? 'error_login');
+            $loginBlockMeta = [];
+            if (lsis_security_is_login_blocked($usuarioForm, $loginBlockMeta)) {
+                if (!empty($loginBlockMeta['fail_closed'])) {
+                    $err = 'No se pudo iniciar sesión.';
+                    $errorCode = 'seguridad_incompleta';
+                    lsis_security_record_attempt('login', $usuarioForm, 0, 'seguridad_incompleta');
+                } else {
+                    $err = 'Usuario o contrasena incorrectos.';
+                    $errorCode = 'bloqueado';
 
-            if ($r['ok']) {
-                if ($isAjax) {
-                    header('Content-Type: application/json; charset=UTF-8');
-                    echo json_encode([
-                        'ok' => true,
-                        'redirect' => 'inicio.php',
-                        'code' => (string) ($r['code'] ?? 'ok'),
-                        'csrf_token_nuevo' => lsis_csrf_get_token('login_form'),
-                    ]);
+                    if (!empty($loginBlockMeta['blocked_until'])) {
+                        $blockedUntilTs = strtotime((string) $loginBlockMeta['blocked_until']);
+                        if ($blockedUntilTs !== false) {
+                            $secondsLeft = $blockedUntilTs - time();
+                            if ($secondsLeft > 0) {
+                                $retryAfterSeconds = $secondsLeft;
+                                $retryAfterMinutes = (int) ceil($secondsLeft / 60);
+                            }
+                        }
+                    }
+
+                    lsis_security_record_attempt('login', $usuarioForm, 0, 'bloqueado');
+                }
+            } else {
+                try {
+                    $r = login($usuarioForm, $clave);
+                } catch (Throwable $e) {
+                    error_log('[login] Error interno: ' . $e->getMessage());
+                    $r = ['ok' => false, 'error' => 'No se pudo iniciar sesión.', 'code' => 'auth_error'];
+                }
+                $errorCode = (string) ($r['code'] ?? 'error_login');
+
+                if ($r['ok']) {
+                    lsis_security_clear_login_block_state($usuarioForm);
+
+                    if ($isAjax) {
+                        header('Content-Type: application/json; charset=UTF-8');
+                        echo json_encode([
+                            'ok' => true,
+                            'redirect' => 'inicio.php',
+                            'code' => (string) ($r['code'] ?? 'ok'),
+                            'csrf_token_nuevo' => lsis_csrf_get_token('login_form'),
+                        ]);
+                        exit;
+                    }
+
+                    header('Location: inicio.php');
                     exit;
                 }
 
-                header('Location: inicio.php');
-                exit;
-            }
+                if ($errorCode === 'credenciales_invalidas') {
+                    $failureMeta = [];
+                    $okFailureUpdate = lsis_security_register_credential_failure($usuarioForm, $failureMeta);
+                    if (!$okFailureUpdate && !empty($failureMeta['fail_closed'])) {
+                        $err = 'No se pudo iniciar sesión.';
+                        $errorCode = 'seguridad_incompleta';
+                    }
+                }
 
-            $err = $r['error'] ?? 'No se pudo iniciar sesión.';
+                if ($err === '') {
+                    $err = $r['error'] ?? 'No se pudo iniciar sesión.';
+                }
+            }
         }
     }
-
     if ($isAjax) {
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode([

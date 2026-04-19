@@ -43,19 +43,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $setupResponseCode = 'csrf';
     }
 
+    $setupDepsMeta = [];
+    if (!$errores && !lsis_security_setup_dependencies_ok($setupDepsMeta)) {
+        $errores[] = 'No se pudo completar el registro inicial.';
+        $setupAttemptReason = 'seguridad_incompleta';
+        $setupResponseCode = 'seguridad_incompleta';
+        error_log('[registro_inicial] Dependencias de seguridad incompletas: ' . (string) ($setupDepsMeta['reason'] ?? 'sin_detalle'));
+    }
+
     $setupBlockMeta = [];
     if (!$errores && lsis_security_is_setup_blocked($setupBlockMeta)) {
-        $errores[] = 'No se pudo completar el registro inicial.';
-        $setupAttemptReason = 'bloqueado';
-        $setupResponseCode = 'bloqueado';
+        if (!empty($setupBlockMeta['fail_closed'])) {
+            $errores[] = 'No se pudo completar el registro inicial.';
+            $setupAttemptReason = 'seguridad_incompleta';
+            $setupResponseCode = 'seguridad_incompleta';
+            error_log('[registro_inicial] Fallo cerrado en control de abuso: ' . (string) ($setupBlockMeta['reason'] ?? 'sin_detalle'));
+        } else {
+            $errores[] = 'No se pudo completar el registro inicial.';
+            $setupAttemptReason = 'bloqueado';
+            $setupResponseCode = 'bloqueado';
 
-        if (!empty($setupBlockMeta['blocked_until'])) {
-            $blockedUntilTs = strtotime((string) $setupBlockMeta['blocked_until']);
-            if ($blockedUntilTs !== false) {
-                $secondsLeft = $blockedUntilTs - time();
-                if ($secondsLeft > 0) {
-                    $retryAfterSeconds = $secondsLeft;
-                    $retryAfterMinutes = (int) ceil($secondsLeft / 60);
+            if (!empty($setupBlockMeta['blocked_until'])) {
+                $blockedUntilTs = strtotime((string) $setupBlockMeta['blocked_until']);
+                if ($blockedUntilTs !== false) {
+                    $secondsLeft = $blockedUntilTs - time();
+                    if ($secondsLeft > 0) {
+                        $retryAfterSeconds = $secondsLeft;
+                        $retryAfterMinutes = (int) ceil($secondsLeft / 60);
+                    }
                 }
             }
         }
@@ -167,7 +182,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $setupAttemptReason = 'error';
             $setupResponseCode = 'error';
-            $errores[] = $e->getMessage() !== '' ? $e->getMessage() : 'No se pudo completar el registro inicial.';
+            error_log('[registro_inicial] Error interno: ' . $e->getMessage());
+            $errores[] = 'No se pudo completar el registro inicial.';
         }
     }
 

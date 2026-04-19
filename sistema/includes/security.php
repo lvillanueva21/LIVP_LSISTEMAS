@@ -229,8 +229,77 @@ function lsis_security_record_attempt($endpoint, $usuario, $exito, $motivo)
     }
 }
 
+function lsis_security_login_dependencies_ok(&$meta = null)
+{
+    $meta = [
+        'ok' => true,
+        'reason' => '',
+    ];
+
+    if (!lsis_security_table_exists('lsis_configuracion_seguridad')) {
+        $meta['ok'] = false;
+        $meta['reason'] = 'falta_lsis_configuracion_seguridad';
+        return false;
+    }
+
+    $policy = lsis_get_security_policy();
+    if ((int) $policy['limitador_login_activo'] !== 1) {
+        return true;
+    }
+
+    $requiredTables = ['lsis_intentos_acceso', 'lsis_bloqueos_login'];
+    foreach ($requiredTables as $tableName) {
+        if (!lsis_security_table_exists($tableName)) {
+            $meta['ok'] = false;
+            $meta['reason'] = 'falta_' . $tableName;
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function lsis_security_setup_dependencies_ok(&$meta = null)
+{
+    $meta = [
+        'ok' => true,
+        'reason' => '',
+    ];
+
+    if (!lsis_security_table_exists('lsis_configuracion_seguridad')) {
+        $meta['ok'] = false;
+        $meta['reason'] = 'falta_lsis_configuracion_seguridad';
+        return false;
+    }
+
+    $policy = lsis_get_security_policy();
+    if ((int) $policy['control_abuso_setup_activo'] !== 1) {
+        return true;
+    }
+
+    if (!lsis_security_table_exists('lsis_intentos_acceso')) {
+        $meta['ok'] = false;
+        $meta['reason'] = 'falta_lsis_intentos_acceso';
+        return false;
+    }
+
+    return true;
+}
+
 function lsis_security_is_login_blocked($usuario, &$meta = null)
 {
+    $depsMeta = [];
+    if (!lsis_security_login_dependencies_ok($depsMeta)) {
+        $meta = [
+            'blocked' => true,
+            'count' => 0,
+            'blocked_until' => null,
+            'fail_closed' => true,
+            'reason' => (string) ($depsMeta['reason'] ?? 'dependencias_login'),
+        ];
+        return true;
+    }
+
     $policy = lsis_get_security_policy();
     $usuario = trim((string) $usuario);
     $ip = lsis_security_client_ip();
@@ -239,13 +308,11 @@ function lsis_security_is_login_blocked($usuario, &$meta = null)
         'blocked' => false,
         'count' => 0,
         'blocked_until' => null,
+        'fail_closed' => false,
+        'reason' => '',
     ];
 
     if ((int) $policy['limitador_login_activo'] !== 1) {
-        return false;
-    }
-
-    if (!lsis_security_table_exists('lsis_intentos_acceso')) {
         return false;
     }
 
@@ -254,49 +321,260 @@ function lsis_security_is_login_blocked($usuario, &$meta = null)
     $blockActive = ((int) $policy['bloqueo_temporal_activo'] === 1);
     $blockMin = (int) $policy['bloqueo_temporal_minutos'];
 
-    $from = date('Y-m-d H:i:s', time() - ($windowMin * 60));
-
     try {
-        $sql = "
-            SELECT COUNT(*) AS c, MAX(intento_at) AS last_fail
-            FROM lsis_intentos_acceso
-            WHERE endpoint = 'login'
-              AND exito = 0
-              AND usuario = ?
+        $st = db()->prepare("
+            SELECT id, intentos_fallidos, ultimo_intento_at, bloqueado_hasta
+            FROM lsis_bloqueos_login
+            WHERE usuario = ?
               AND ip = ?
-              AND intento_at >= ?
-        ";
-        $st = db()->prepare($sql);
-        $st->execute([$usuario, $ip, $from]);
+            LIMIT 1
+        ");
+        $st->execute([$usuario, $ip]);
         $row = $st->fetch();
 
-        $count = (int) ($row['c'] ?? 0);
-        $lastFail = (string) ($row['last_fail'] ?? '');
-        $meta['count'] = $count;
-
-        if ($count < $maxFail) {
+        if (!$row) {
             return false;
         }
 
-        if (!$blockActive) {
+        $rowId = (int) ($row['id'] ?? 0);
+        $count = (int) ($row['intentos_fallidos'] ?? 0);
+        $lastFail = (string) ($row['ultimo_intento_at'] ?? '');
+        $blockedUntil = (string) ($row['bloqueado_hasta'] ?? '');
+        $meta['count'] = $count;
+
+        $nowTs = time();
+        $windowEndTs = 0;
+        if ($lastFail !== '') {
+            $lastFailTs = strtotime($lastFail);
+            if ($lastFailTs !== false) {
+                $windowEndTs = $lastFailTs + ($windowMin * 60);
+            }
+        }
+
+        if ($windowEndTs > 0 && $nowTs >= $windowEndTs && $rowId > 0) {
+            $stReset = db()->prepare("
+                UPDATE lsis_bloqueos_login
+                SET intentos_fallidos = 0,
+                    bloqueado_hasta = NULL,
+                    actualizado_en = NOW()
+                WHERE id = ?
+            ");
+            $stReset->execute([$rowId]);
+            return false;
+        }
+
+        if ($blockActive) {
+            if ($blockedUntil !== '') {
+                $blockedUntilTs = strtotime($blockedUntil);
+                if ($blockedUntilTs !== false) {
+                    if ($nowTs < $blockedUntilTs) {
+                        $meta['blocked'] = true;
+                        $meta['blocked_until'] = date('Y-m-d H:i:s', $blockedUntilTs);
+                        return true;
+                    }
+
+                    if ($rowId > 0) {
+                        $stClear = db()->prepare("
+                            UPDATE lsis_bloqueos_login
+                            SET intentos_fallidos = 0,
+                                bloqueado_hasta = NULL,
+                                actualizado_en = NOW()
+                            WHERE id = ?
+                        ");
+                        $stClear->execute([$rowId]);
+                    }
+                    return false;
+                }
+            }
+
+            if ($count >= $maxFail && $windowEndTs > 0) {
+                $untilTs = $nowTs + ($blockMin * 60);
+                $untilStr = date('Y-m-d H:i:s', $untilTs);
+                $stForce = db()->prepare("
+                    UPDATE lsis_bloqueos_login
+                    SET bloqueado_hasta = ?,
+                        actualizado_en = NOW()
+                    WHERE id = ?
+                ");
+                $stForce->execute([$untilStr, $rowId]);
+
+                $meta['blocked'] = true;
+                $meta['blocked_until'] = $untilStr;
+                return true;
+            }
+
+            return false;
+        }
+
+        if ($count >= $maxFail && $windowEndTs > 0 && $nowTs < $windowEndTs) {
             $meta['blocked'] = true;
+            $meta['blocked_until'] = date('Y-m-d H:i:s', $windowEndTs);
             return true;
         }
 
-        if ($lastFail === '') {
-            $meta['blocked'] = true;
-            return true;
+        return false;
+    } catch (Throwable $e) {
+        $meta['blocked'] = true;
+        $meta['fail_closed'] = true;
+        $meta['reason'] = 'error_login_block_check';
+        return true;
+    }
+}
+
+function lsis_security_register_credential_failure($usuario, &$meta = null)
+{
+    $meta = [
+        'blocked' => false,
+        'count' => 0,
+        'blocked_until' => null,
+        'fail_closed' => false,
+        'reason' => '',
+    ];
+
+    $depsMeta = [];
+    if (!lsis_security_login_dependencies_ok($depsMeta)) {
+        $meta['blocked'] = true;
+        $meta['fail_closed'] = true;
+        $meta['reason'] = (string) ($depsMeta['reason'] ?? 'dependencias_login');
+        return false;
+    }
+
+    $policy = lsis_get_security_policy();
+    if ((int) $policy['limitador_login_activo'] !== 1) {
+        return true;
+    }
+
+    $usuario = trim((string) $usuario);
+    $ip = lsis_security_client_ip();
+    $maxFail = (int) $policy['max_intentos_fallidos'];
+    $windowMin = (int) $policy['ventana_intentos_minutos'];
+    $blockActive = ((int) $policy['bloqueo_temporal_activo'] === 1);
+    $blockMin = (int) $policy['bloqueo_temporal_minutos'];
+    $pdo = db();
+    $ownTx = false;
+
+    try {
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+            $ownTx = true;
         }
 
-        $untilTs = strtotime($lastFail . ' +' . $blockMin . ' minutes');
-        if ($untilTs === false) {
-            $meta['blocked'] = true;
-            return true;
+        $stSel = $pdo->prepare("
+            SELECT id, intentos_fallidos, ultimo_intento_at, bloqueado_hasta
+            FROM lsis_bloqueos_login
+            WHERE usuario = ?
+              AND ip = ?
+            LIMIT 1
+            FOR UPDATE
+        ");
+        $stSel->execute([$usuario, $ip]);
+        $row = $stSel->fetch();
+
+        if (!$row) {
+            $stIns = $pdo->prepare("
+                INSERT INTO lsis_bloqueos_login
+                    (usuario, ip, intentos_fallidos, ultimo_intento_at, bloqueado_hasta, creado_en, actualizado_en)
+                VALUES
+                    (?, ?, 0, NULL, NULL, NOW(), NOW())
+            ");
+            $stIns->execute([$usuario, $ip]);
+            $rowId = (int) $pdo->lastInsertId();
+            $row = [
+                'id' => $rowId,
+                'intentos_fallidos' => 0,
+                'ultimo_intento_at' => null,
+                'bloqueado_hasta' => null,
+            ];
         }
 
-        $meta['blocked_until'] = date('Y-m-d H:i:s', $untilTs);
-        $meta['blocked'] = (time() < $untilTs);
-        return $meta['blocked'];
+        $rowId = (int) ($row['id'] ?? 0);
+        $count = (int) ($row['intentos_fallidos'] ?? 0);
+        $lastFail = (string) ($row['ultimo_intento_at'] ?? '');
+        $blockedUntil = (string) ($row['bloqueado_hasta'] ?? '');
+        $nowTs = time();
+
+        if ($blockedUntil !== '') {
+            $blockedUntilTs = strtotime($blockedUntil);
+            if ($blockedUntilTs !== false && $nowTs < $blockedUntilTs) {
+                $meta['blocked'] = true;
+                $meta['count'] = $count;
+                $meta['blocked_until'] = date('Y-m-d H:i:s', $blockedUntilTs);
+                if ($ownTx) {
+                    $pdo->commit();
+                }
+                return true;
+            }
+        }
+
+        if ($lastFail !== '') {
+            $lastFailTs = strtotime($lastFail);
+            if ($lastFailTs !== false && $nowTs >= ($lastFailTs + ($windowMin * 60))) {
+                $count = 0;
+            }
+        }
+
+        $count++;
+        $meta['count'] = $count;
+        $blockedUntilValue = null;
+
+        if ($count >= $maxFail) {
+            if ($blockActive) {
+                $blockedUntilTs = $nowTs + ($blockMin * 60);
+                $blockedUntilValue = date('Y-m-d H:i:s', $blockedUntilTs);
+                $meta['blocked'] = true;
+                $meta['blocked_until'] = $blockedUntilValue;
+            } else {
+                $windowEndTs = $nowTs + ($windowMin * 60);
+                $meta['blocked'] = true;
+                $meta['blocked_until'] = date('Y-m-d H:i:s', $windowEndTs);
+            }
+        }
+
+        $stUpd = $pdo->prepare("
+            UPDATE lsis_bloqueos_login
+            SET intentos_fallidos = ?,
+                ultimo_intento_at = NOW(),
+                bloqueado_hasta = ?,
+                actualizado_en = NOW()
+            WHERE id = ?
+        ");
+        $stUpd->execute([$count, $blockedUntilValue, $rowId]);
+
+        if ($ownTx) {
+            $pdo->commit();
+        }
+
+        return true;
+    } catch (Throwable $e) {
+        if ($ownTx && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        $meta['blocked'] = true;
+        $meta['fail_closed'] = true;
+        $meta['reason'] = 'error_login_block_update';
+        return false;
+    }
+}
+
+function lsis_security_clear_login_block_state($usuario)
+{
+    $depsMeta = [];
+    if (!lsis_security_login_dependencies_ok($depsMeta)) {
+        return false;
+    }
+
+    $policy = lsis_get_security_policy();
+    if ((int) $policy['limitador_login_activo'] !== 1) {
+        return true;
+    }
+
+    $usuario = trim((string) $usuario);
+    $ip = lsis_security_client_ip();
+
+    try {
+        $st = db()->prepare("DELETE FROM lsis_bloqueos_login WHERE usuario = ? AND ip = ?");
+        $st->execute([$usuario, $ip]);
+        return true;
     } catch (Throwable $e) {
         return false;
     }
@@ -304,6 +582,18 @@ function lsis_security_is_login_blocked($usuario, &$meta = null)
 
 function lsis_security_is_setup_blocked(&$meta = null)
 {
+    $depsMeta = [];
+    if (!lsis_security_setup_dependencies_ok($depsMeta)) {
+        $meta = [
+            'blocked' => true,
+            'count' => 0,
+            'blocked_until' => null,
+            'fail_closed' => true,
+            'reason' => (string) ($depsMeta['reason'] ?? 'dependencias_setup'),
+        ];
+        return true;
+    }
+
     $policy = lsis_get_security_policy();
     $ip = lsis_security_client_ip();
 
@@ -311,20 +601,17 @@ function lsis_security_is_setup_blocked(&$meta = null)
         'blocked' => false,
         'count' => 0,
         'blocked_until' => null,
+        'fail_closed' => false,
+        'reason' => '',
     ];
 
     if ((int) $policy['control_abuso_setup_activo'] !== 1) {
         return false;
     }
 
-    if (!lsis_security_table_exists('lsis_intentos_acceso')) {
-        return false;
-    }
-
     $maxFail = (int) $policy['max_intentos_setup'];
     $windowMin = (int) $policy['ventana_setup_minutos'];
     $blockMin = (int) $policy['bloqueo_setup_minutos'];
-
     $from = date('Y-m-d H:i:s', time() - ($windowMin * 60));
 
     try {
@@ -363,6 +650,9 @@ function lsis_security_is_setup_blocked(&$meta = null)
         $meta['blocked'] = (time() < $untilTs);
         return $meta['blocked'];
     } catch (Throwable $e) {
-        return false;
+        $meta['blocked'] = true;
+        $meta['fail_closed'] = true;
+        $meta['reason'] = 'error_setup_block_check';
+        return true;
     }
 }

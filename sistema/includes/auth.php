@@ -288,6 +288,11 @@ function login($usuario, $clave)
         return ['ok' => false, 'error' => 'Ingresa usuario y contrasena.', 'code' => 'datos_incompletos'];
     }
 
+    if (!lsis_auth_table_exists('lsis_usuarios') || !lsis_auth_table_exists('lsis_roles') || !lsis_auth_table_exists('lsis_usuario_roles')) {
+        lsis_security_record_attempt('login', $usuario, 0, 'auth_incompleta');
+        return ['ok' => false, 'error' => 'No se pudo iniciar sesiÃ³n.', 'code' => 'auth_incompleta'];
+    }
+
     $sql = "SELECT id, usuario, clave, nombres, apellidos, estado FROM lsis_usuarios WHERE usuario = ? LIMIT 1";
     $st = db()->prepare($sql);
     $st->execute([$usuario]);
@@ -379,7 +384,9 @@ function requireAuth()
     }
 
     if (!lsis_auth_table_exists('lsis_sesiones')) {
-        return;
+        logout();
+        header('Location: login.php?m=sesion');
+        exit;
     }
 
     $uid = (int) ($_SESSION['user']['id'] ?? 0);

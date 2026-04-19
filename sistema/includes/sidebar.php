@@ -33,7 +33,7 @@ if ($nombreCompleto === '') {
           </a>
         </li>
         <li class="nav-item">
-          <a href="logout.php" class="nav-link">
+          <a href="#" class="nav-link" onclick="event.preventDefault(); var f = document.getElementById('form-logout'); if (f) { f.submit(); }">
             <i class="nav-icon fas fa-sign-out-alt"></i>
             <p>Cerrar sesion</p>
           </a>
