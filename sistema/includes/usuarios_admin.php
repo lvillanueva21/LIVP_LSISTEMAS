@@ -462,7 +462,7 @@ function uadm_list_users($page, $perPage, $search, $estado)
             u.ultimo_login_ip,
             GROUP_CONCAT(DISTINCT CASE WHEN ur.estado = 1 AND r.estado = 1 THEN r.nombre END ORDER BY r.nombre ASC SEPARATOR ', ') AS roles_activos,
             GROUP_CONCAT(DISTINCT CASE WHEN ur.estado = 1 AND r.estado = 1 THEN ur.id_rol END ORDER BY ur.id_rol ASC SEPARATOR ',') AS roles_activos_ids,
-            MAX(CASE WHEN ur.estado = 1 AND r.estado = 1 AND LOWER(r.nombre) = 'superadmin' THEN 1 ELSE 0 END) AS es_superadmin_activo
+            MAX(CASE WHEN ur.estado = 1 AND r.estado = 1 AND r.es_sistema = 1 AND r.es_protegido = 1 THEN 1 ELSE 0 END) AS es_superadmin_activo
         FROM lsis_usuarios u
         LEFT JOIN lsis_usuario_roles ur ON ur.id_usuario = u.id
         LEFT JOIN lsis_roles r ON r.id = ur.id_rol

@@ -171,14 +171,13 @@ function prm_fetch_roles_catalog()
     $rows = db()->query($sql)->fetchAll();
     $out = [];
     foreach ($rows as $row) {
-        $name = (string) ($row['nombre'] ?? '');
         $isProtected = rls_role_is_protected_row($row);
         $out[] = [
             'id' => (int) ($row['id'] ?? 0),
-            'nombre' => $name,
+            'nombre' => (string) ($row['nombre'] ?? ''),
             'descripcion' => (string) ($row['descripcion'] ?? ''),
             'estado' => ((int) ($row['estado'] ?? 0) === 1) ? 1 : 0,
-            'es_superadmin' => rls_is_superadmin_name($name) ? 1 : 0,
+            'es_superadmin' => $isProtected ? 1 : 0,
             'es_sistema' => ((int) ($row['es_sistema'] ?? 0) === 1) ? 1 : 0,
             'es_protegido' => $isProtected ? 1 : 0,
         ];

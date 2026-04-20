@@ -174,12 +174,8 @@ function rls_is_superadmin_name($name)
 function rls_role_is_protected_row(array $roleRow)
 {
     $isProtected = ((int) ($roleRow['es_protegido'] ?? 0) === 1);
-    if ($isProtected) {
-        return true;
-    }
-
-    // Compatibilidad temporal: fallback por nombre durante transicion.
-    return rls_is_superadmin_name((string) ($roleRow['nombre'] ?? ''));
+    $isSystem = ((int) ($roleRow['es_sistema'] ?? 0) === 1);
+    return $isProtected && $isSystem;
 }
 
 function rls_validate_role_name($name)
@@ -367,7 +363,7 @@ function rls_list_roles($page, $perPage, $search, $estado)
             'nombre' => $nombre,
             'descripcion' => (string) ($row['descripcion'] ?? ''),
             'estado' => ((int) ($row['estado'] ?? 0) === 1) ? 1 : 0,
-            'es_superadmin' => rls_is_superadmin_name($nombre) ? 1 : 0,
+            'es_superadmin' => $isProtected ? 1 : 0,
             'es_sistema' => ((int) ($row['es_sistema'] ?? 0) === 1) ? 1 : 0,
             'es_protegido' => $isProtected ? 1 : 0,
             'usuarios_activos_asignados' => (int) ($row['usuarios_activos_asignados'] ?? 0),

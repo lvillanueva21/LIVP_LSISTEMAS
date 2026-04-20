@@ -93,53 +93,30 @@ function lsis_auth_get_protected_system_role_ids($forUpdate = false, $onlyActive
 
     $forUpdate = (bool) $forUpdate;
     $onlyActive = (bool) $onlyActive;
-    $ids = [];
-
-    if (lsis_auth_roles_hardening_columns_ready()) {
-        $sql = "
-            SELECT id
-            FROM lsis_roles
-            WHERE es_sistema = 1
-              AND es_protegido = 1
-        ";
-        if ($onlyActive) {
-            $sql .= " AND estado = 1";
-        }
-        $sql .= " ORDER BY id ASC";
-        if ($forUpdate) {
-            $sql .= " FOR UPDATE";
-        }
-
-        $rows = db()->query($sql)->fetchAll(PDO::FETCH_COLUMN);
-        foreach ((array) $rows as $value) {
-            $rid = (int) $value;
-            if ($rid > 0) {
-                $ids[] = $rid;
-            }
-        }
+    if (!lsis_auth_roles_hardening_columns_ready()) {
+        return [];
     }
 
-    // Compatibilidad temporal durante migracion: fallback por nombre.
-    if (!$ids) {
-        $sql = "
-            SELECT id
-            FROM lsis_roles
-            WHERE LOWER(nombre) = 'superadmin'
-        ";
-        if ($onlyActive) {
-            $sql .= " AND estado = 1";
-        }
-        $sql .= " ORDER BY id ASC";
-        if ($forUpdate) {
-            $sql .= " FOR UPDATE";
-        }
+    $sql = "
+        SELECT id
+        FROM lsis_roles
+        WHERE es_sistema = 1
+          AND es_protegido = 1
+    ";
+    if ($onlyActive) {
+        $sql .= " AND estado = 1";
+    }
+    $sql .= " ORDER BY id ASC";
+    if ($forUpdate) {
+        $sql .= " FOR UPDATE";
+    }
 
-        $rows = db()->query($sql)->fetchAll(PDO::FETCH_COLUMN);
-        foreach ((array) $rows as $value) {
-            $rid = (int) $value;
-            if ($rid > 0) {
-                $ids[] = $rid;
-            }
+    $rows = db()->query($sql)->fetchAll(PDO::FETCH_COLUMN);
+    $ids = [];
+    foreach ((array) $rows as $value) {
+        $rid = (int) $value;
+        if ($rid > 0) {
+            $ids[] = $rid;
         }
     }
 

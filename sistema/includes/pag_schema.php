@@ -18,6 +18,25 @@ function pag_schema_tables_ready()
         && pag_schema_table_exists('pag_roles_permisos');
 }
 
+function pag_schema_roles_hardening_columns_ready()
+{
+    if (!pag_schema_table_exists('lsis_roles')) {
+        return false;
+    }
+
+    $sql = "
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'lsis_roles'
+          AND COLUMN_NAME IN ('es_sistema', 'es_protegido')
+    ";
+    $rows = db()->query($sql)->fetchAll(PDO::FETCH_COLUMN);
+    $rows = is_array($rows) ? $rows : [];
+    $map = array_fill_keys($rows, true);
+    return isset($map['es_sistema']) && isset($map['es_protegido']);
+}
+
 function pag_schema_is_valid_slug($slug)
 {
     $slug = trim((string) $slug);
@@ -443,8 +462,15 @@ function pag_schema_seed_fixed_pages()
         }
     }
 
-    if (pag_schema_table_exists('lsis_roles')) {
-        $roleRows = db()->query("SELECT id FROM lsis_roles WHERE estado = 1 AND LOWER(nombre) = 'superadmin'")->fetchAll();
+    if (pag_schema_table_exists('lsis_roles') && pag_schema_roles_hardening_columns_ready()) {
+        $roleRows = db()->query("
+            SELECT id
+            FROM lsis_roles
+            WHERE estado = 1
+              AND es_sistema = 1
+              AND es_protegido = 1
+            ORDER BY id ASC
+        ")->fetchAll();
         $roleIds = [];
         foreach ($roleRows as $row) {
             $rid = (int) ($row['id'] ?? 0);
@@ -482,10 +508,10 @@ function pag_schema_seed_fixed_pages()
                 }
             }
         } else {
-            $result['errors'][] = 'No se encontro rol Superadmin activo para asignar permisos base.';
+            $result['errors'][] = 'No se encontro rol protegido activo para asignar permisos base.';
         }
     } else {
-        $result['errors'][] = 'Tabla lsis_roles no disponible para asignar permisos base.';
+        $result['errors'][] = 'Tabla lsis_roles o columnas de hardening no disponibles para asignar permisos base.';
     }
 
     $result['ok'] = true;

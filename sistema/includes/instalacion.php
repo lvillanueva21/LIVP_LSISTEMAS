@@ -11,13 +11,40 @@ function lsis_table_exists($tableName)
     return lsis_table_exists_cached($tableName);
 }
 
-function lsis_get_superadmin_role_id()
+function lsis_roles_hardening_columns_ready()
 {
     if (!lsis_table_exists('lsis_roles')) {
+        return false;
+    }
+
+    $sql = "
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'lsis_roles'
+          AND COLUMN_NAME IN ('es_sistema', 'es_protegido')
+    ";
+    $rows = db()->query($sql)->fetchAll(PDO::FETCH_COLUMN);
+    $rows = is_array($rows) ? $rows : [];
+    $map = array_fill_keys($rows, true);
+    return isset($map['es_sistema']) && isset($map['es_protegido']);
+}
+
+function lsis_get_superadmin_role_id()
+{
+    if (!lsis_table_exists('lsis_roles') || !lsis_roles_hardening_columns_ready()) {
         return 0;
     }
 
-    $sql = "SELECT id FROM lsis_roles WHERE nombre = 'Superadmin' LIMIT 1";
+    $sql = "
+        SELECT id
+        FROM lsis_roles
+        WHERE es_sistema = 1
+          AND es_protegido = 1
+          AND estado = 1
+        ORDER BY id ASC
+        LIMIT 1
+    ";
     $res = db()->query($sql);
     $row = $res ? $res->fetch() : null;
 
@@ -26,7 +53,12 @@ function lsis_get_superadmin_role_id()
 
 function lsis_superadmin_exists()
 {
-    if (!lsis_table_exists('lsis_usuarios') || !lsis_table_exists('lsis_usuario_roles') || !lsis_table_exists('lsis_roles')) {
+    if (
+        !lsis_table_exists('lsis_usuarios')
+        || !lsis_table_exists('lsis_usuario_roles')
+        || !lsis_table_exists('lsis_roles')
+        || !lsis_roles_hardening_columns_ready()
+    ) {
         return false;
     }
 
@@ -35,7 +67,8 @@ function lsis_superadmin_exists()
         FROM lsis_usuarios u
         INNER JOIN lsis_usuario_roles ur ON ur.id_usuario = u.id
         INNER JOIN lsis_roles r ON r.id = ur.id_rol
-        WHERE r.nombre = 'Superadmin'
+        WHERE r.es_sistema = 1
+          AND r.es_protegido = 1
           AND u.estado = 1
           AND ur.estado = 1
           AND r.estado = 1

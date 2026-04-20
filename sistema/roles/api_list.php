@@ -60,7 +60,7 @@ try {
         'data' => [
             'list' => $list,
             'allowed_actions' => $allowedActions,
-            'deuda_tecnica_superadmin_por_nombre' => true,
+            'deuda_tecnica_superadmin_por_nombre' => false,
         ],
         'csrf_token_nuevo' => rls_new_csrf_token(),
     ]);
