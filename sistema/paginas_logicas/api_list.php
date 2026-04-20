@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../includes/paginas_logicas_admin.php';
 
 $permissions = pgl_permission_codes();

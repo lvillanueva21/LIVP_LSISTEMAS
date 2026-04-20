@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
     http_response_code(403);
     exit('Acceso directo no permitido.');
@@ -181,12 +181,12 @@ function pgl_parse_positive_id_or_null($value)
     }
 
     if (preg_match('/^\d+$/', $value) !== 1) {
-        return [false, null, 'Valor invalido.'];
+        return [false, null, 'Valor invalido. Debe ser un ID numerico positivo.'];
     }
 
     $id = (int) $value;
     if ($id <= 0) {
-        return [false, null, 'Valor invalido.'];
+        return [false, null, 'Valor invalido. Debe ser un ID numerico positivo.'];
     }
 
     return [true, $id, ''];
@@ -196,11 +196,11 @@ function pgl_validate_menu_text($value, $label, $maxLen)
 {
     $value = trim((string) $value);
     if ($value === '') {
-        return [false, '', $label . ' requerido.'];
+        return [false, '', $label . ' es obligatorio.'];
     }
 
     if (strlen($value) > (int) $maxLen) {
-        return [false, '', $label . ' excede longitud permitida.'];
+        return [false, '', $label . ' excede la longitud permitida.'];
     }
 
     return [true, $value, ''];
@@ -214,7 +214,7 @@ function pgl_validate_optional_text($value, $maxLen)
     }
 
     if (strlen($value) > (int) $maxLen) {
-        return [false, null, 'Excede longitud permitida.'];
+        return [false, null, 'Excede la longitud permitida.'];
     }
 
     return [true, $value, ''];
@@ -224,11 +224,11 @@ function pgl_validate_slug($slug)
 {
     $slug = trim((string) $slug);
     if ($slug === '') {
-        return [false, '', 'Slug requerido.'];
+        return [false, '', 'Slug obligatorio.'];
     }
 
     if (!pag_schema_is_valid_slug($slug)) {
-        return [false, '', 'Slug invalido.'];
+        return [false, '', 'Slug invalido. Usa solo minusculas, numeros y guion medio.'];
     }
 
     return [true, $slug, ''];

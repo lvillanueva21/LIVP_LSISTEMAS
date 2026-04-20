@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../includes/paginas_logicas_admin.php';
 
 $permissions = pgl_permission_codes();
@@ -196,6 +196,7 @@ try {
     $code = 'error_creacion';
     $message = 'No se pudo crear la pagina.';
     $validationErrors = [];
+    $httpStatus = 500;
 
     if ($e instanceof RuntimeException) {
         $msg = $e->getMessage();
@@ -203,25 +204,29 @@ try {
             $code = 'slug_duplicado';
             $message = 'El slug ya existe.';
             $validationErrors['slug_pagina'] = 'El slug ya existe.';
+            $httpStatus = 422;
         } elseif (strpos($msg, 'padre_invalido:') === 0) {
             $code = 'padre_invalido';
             $message = substr($msg, strlen('padre_invalido:'));
             $validationErrors['id_padre'] = $message;
+            $httpStatus = 422;
         } elseif (strpos($msg, 'modulo_section_invalido:') === 0) {
             $code = 'modulo_section_invalido';
             $message = substr($msg, strlen('modulo_section_invalido:'));
             $validationErrors['modulo_codigo'] = $message;
+            $httpStatus = 422;
         } elseif (strpos($msg, 'tipo_jerarquia_invalida:') === 0) {
             $code = 'tipo_jerarquia_invalida';
             $message = substr($msg, strlen('tipo_jerarquia_invalida:'));
             $validationErrors['tipo_pagina'] = $message;
+            $httpStatus = 422;
         } elseif ($msg === 'permiso_base_error') {
             $code = 'permiso_base_error';
             $message = 'No se pudo generar el permiso base .view.';
         }
     }
 
-    pgl_json_response(500, [
+    pgl_json_response($httpStatus, [
         'ok' => false,
         'code' => $code,
         'message' => $message,

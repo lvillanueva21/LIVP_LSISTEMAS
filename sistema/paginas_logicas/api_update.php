@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../includes/paginas_logicas_admin.php';
 
 $permissions = pgl_permission_codes();
@@ -306,17 +306,20 @@ try {
     $code = 'error_actualizacion';
     $message = 'No se pudo actualizar la pagina.';
     $validationErrors = [];
+    $httpStatus = 500;
 
     if ($e instanceof RuntimeException) {
         $msg = $e->getMessage();
         if ($msg === 'pagina_no_encontrada') {
             $code = 'pagina_no_encontrada';
             $message = 'Pagina no encontrada.';
+            $httpStatus = 404;
         } elseif (strpos($msg, 'campo_bloqueado:') === 0) {
             $code = 'campo_bloqueado';
             $field = substr($msg, strlen('campo_bloqueado:'));
             $message = 'Campo no editable para pagina fija.';
             $validationErrors[$field] = 'Campo bloqueado en esta V1.';
+            $httpStatus = 422;
         } elseif (strpos($msg, 'validacion:') === 0) {
             $code = 'validacion';
             $message = 'Revisa los valores enviados.';
@@ -325,10 +328,11 @@ try {
             if (is_array($decoded)) {
                 $validationErrors = $decoded;
             }
+            $httpStatus = 422;
         }
     }
 
-    pgl_json_response(500, [
+    pgl_json_response($httpStatus, [
         'ok' => false,
         'code' => $code,
         'message' => $message,

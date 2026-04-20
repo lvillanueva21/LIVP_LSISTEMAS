@@ -19,6 +19,29 @@ $pglCanToggle = pag_user_has_permission_code('paginas_logicas.toggle_state');
   data-can-edit="<?php echo $pglCanEdit ? '1' : '0'; ?>"
   data-can-toggle="<?php echo $pglCanToggle ? '1' : '0'; ?>"
 >
+  <style>
+    .pgl-info-toggle {
+      border: 0;
+      background: transparent;
+      color: #007bff;
+      padding: 0 0 0 4px;
+      line-height: 1;
+      vertical-align: middle;
+    }
+    .pgl-info-toggle:focus {
+      outline: none;
+    }
+    .pgl-info-box {
+      background: #111;
+      color: #fff;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-size: 12px;
+      line-height: 1.35;
+      margin-top: 6px;
+    }
+  </style>
+
   <input type="hidden" id="pgl-csrf-token" value="<?php echo htmlspecialchars($pglCsrfToken, ENT_QUOTES, 'UTF-8'); ?>">
 
   <div class="card card-primary card-outline">
@@ -69,10 +92,10 @@ $pglCanToggle = pag_user_has_permission_code('paginas_logicas.toggle_state');
         <div class="col-md-2 d-flex align-items-end">
           <div class="btn-group w-100">
             <button type="button" class="btn btn-default" id="pgl-btn-search">
-              <i class="fas fa-search"></i>
+              <i class="fas fa-search mr-1"></i>Buscar
             </button>
             <button type="button" class="btn btn-default" id="pgl-btn-refresh">
-              <i class="fas fa-sync-alt"></i>
+              <i class="fas fa-sync-alt mr-1"></i>Actualizar
             </button>
           </div>
         </div>
@@ -125,90 +148,169 @@ $pglCanToggle = pag_user_has_permission_code('paginas_logicas.toggle_state');
           <div class="modal-body">
             <input type="hidden" id="pgl-id-pagina" value="0">
             <input type="hidden" id="pgl-es-fija" value="0">
+            <div id="pgl-form-alert" class="alert d-none mb-3" role="alert"></div>
 
             <div class="row">
               <div class="col-md-4">
-                <label for="pgl-tipo-pagina">Tipo de pagina</label>
+                <label for="pgl-tipo-pagina">
+                  Tipo de pagina
+                  <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-tipo"><i class="fas fa-info-circle"></i></button>
+                </label>
                 <select class="form-control" id="pgl-tipo-pagina">
                   <option value="real">Real cargable</option>
                   <option value="contenedor">Contenedor</option>
                 </select>
+                <div id="pgl-info-tipo" class="pgl-info-box d-none">
+                  Obligatorio. Define el comportamiento principal. Real: requiere modulo/section para activarse. Contenedor: agrupa submenus y no carga modulo.
+                </div>
               </div>
               <div class="col-md-4">
-                <label for="pgl-slug-pagina">Slug</label>
+                <label for="pgl-slug-pagina">
+                  Slug
+                  <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-slug"><i class="fas fa-info-circle"></i></button>
+                </label>
                 <input type="text" class="form-control" id="pgl-slug-pagina" maxlength="150">
                 <small class="text-muted">Inmutable despues de crear.</small>
+                <div id="pgl-info-slug" class="pgl-info-box d-none">
+                  Obligatorio en crear. Solo minusculas, numeros y guion medio. Ejemplo valido: reporte-diario. No usar espacios ni guion bajo.
+                </div>
               </div>
               <div class="col-md-4">
-                <label for="pgl-id-padre">Padre (nivel 1)</label>
+                <label for="pgl-id-padre">
+                  Padre (nivel 1)
+                  <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-padre"><i class="fas fa-info-circle"></i></button>
+                </label>
                 <select class="form-control" id="pgl-id-padre">
                   <option value="">Sin padre</option>
                 </select>
+                <div id="pgl-info-padre" class="pgl-info-box d-none">
+                  Opcional para pagina real. Si se usa, debe apuntar a un contenedor activo de nivel 1. En contenedor no aplica.
+                </div>
               </div>
             </div>
 
             <div class="row mt-2">
               <div class="col-md-6">
-                <label for="pgl-titulo-menu">Titulo menu</label>
+                <label for="pgl-titulo-menu">
+                  Titulo menu
+                  <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-titulo-menu"><i class="fas fa-info-circle"></i></button>
+                </label>
                 <input type="text" class="form-control" id="pgl-titulo-menu" maxlength="120">
+                <div id="pgl-info-titulo-menu" class="pgl-info-box d-none">
+                  Obligatorio. Texto mostrado en sidebar y listados. Maximo 120 caracteres.
+                </div>
               </div>
               <div class="col-md-6">
-                <label for="pgl-titulo-pagina">Titulo pagina</label>
+                <label for="pgl-titulo-pagina">
+                  Titulo pagina
+                  <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-titulo-pagina"><i class="fas fa-info-circle"></i></button>
+                </label>
                 <input type="text" class="form-control" id="pgl-titulo-pagina" maxlength="150">
+                <div id="pgl-info-titulo-pagina" class="pgl-info-box d-none">
+                  Obligatorio. Encabezado principal visible dentro de la pagina. Maximo 150 caracteres.
+                </div>
               </div>
             </div>
 
             <div class="form-group mt-2">
-              <label for="pgl-descripcion-pagina">Descripcion pagina</label>
+              <label for="pgl-descripcion-pagina">
+                Descripcion pagina
+                <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-descripcion"><i class="fas fa-info-circle"></i></button>
+              </label>
               <textarea class="form-control" id="pgl-descripcion-pagina" rows="2" maxlength="255"></textarea>
+              <div id="pgl-info-descripcion" class="pgl-info-box d-none">
+                Opcional. Texto de apoyo para contexto de la pagina. Maximo 255 caracteres.
+              </div>
             </div>
 
             <div class="row">
               <div class="col-md-4">
-                <label for="pgl-visible-menu">Visible en sidebar</label>
+                <label for="pgl-visible-menu">
+                  Visible en sidebar
+                  <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-visible"><i class="fas fa-info-circle"></i></button>
+                </label>
                 <select class="form-control" id="pgl-visible-menu">
                   <option value="1">Si</option>
                   <option value="0">No</option>
                 </select>
+                <div id="pgl-info-visible" class="pgl-info-box d-none">
+                  Obligatorio. Solo controla si aparece en menu. No reemplaza validacion de permiso.
+                </div>
               </div>
               <div class="col-md-4">
-                <label for="pgl-estado">Estado</label>
+                <label for="pgl-estado">
+                  Estado
+                  <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-estado"><i class="fas fa-info-circle"></i></button>
+                </label>
                 <select class="form-control" id="pgl-estado">
                   <option value="0">Borrador / Inactiva</option>
                   <option value="1">Activa</option>
                 </select>
+                <div id="pgl-info-estado" class="pgl-info-box d-none">
+                  Obligatorio. Borrador permite guardar sin exponer acceso. Activa exige datos completos y validos en pagina real.
+                </div>
               </div>
               <div class="col-md-4">
-                <label for="pgl-orden-menu">Orden menu</label>
+                <label for="pgl-orden-menu">
+                  Orden menu
+                  <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-orden"><i class="fas fa-info-circle"></i></button>
+                </label>
                 <input type="number" class="form-control" id="pgl-orden-menu" min="0" step="1" value="0">
+                <div id="pgl-info-orden" class="pgl-info-box d-none">
+                  Obligatorio. Numero entero igual o mayor a 0. Recomiendo 10,20,30 para facilitar inserciones futuras.
+                </div>
               </div>
             </div>
 
             <div class="row mt-2">
               <div class="col-md-6">
-                <label for="pgl-icono">Icono (Font Awesome)</label>
+                <label for="pgl-icono">
+                  Icono (Font Awesome)
+                  <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-icono"><i class="fas fa-info-circle"></i></button>
+                </label>
                 <input type="text" class="form-control" id="pgl-icono" maxlength="120" placeholder="fas fa-folder">
+                <div id="pgl-info-icono" class="pgl-info-box d-none">
+                  Opcional. Clase de icono de menu. Ejemplo: fas fa-sitemap. Si no ingresas, el sistema usa uno por defecto.
+                </div>
               </div>
               <div class="col-md-6">
-                <label for="pgl-id-permiso">Permiso base requerido</label>
+                <label for="pgl-id-permiso">
+                  Permiso base requerido
+                  <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-permiso"><i class="fas fa-info-circle"></i></button>
+                </label>
                 <select class="form-control" id="pgl-id-permiso">
                   <option value="">Auto por slug (.view)</option>
                 </select>
+                <div id="pgl-info-permiso" class="pgl-info-box d-none">
+                  Opcional en V1. Si vacio, se autoasigna permiso base con formato slug_normalizado.view.
+                </div>
               </div>
             </div>
 
             <div class="row mt-2">
               <div class="col-md-6">
-                <label for="pgl-modulo-codigo">Modulo</label>
+                <label for="pgl-modulo-codigo">
+                  Modulo
+                  <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-modulo"><i class="fas fa-info-circle"></i></button>
+                </label>
                 <select class="form-control" id="pgl-modulo-codigo">
                   <option value="">Seleccionar modulo</option>
                 </select>
+                <div id="pgl-info-modulo" class="pgl-info-box d-none">
+                  En pagina real activa es obligatorio. Solo permite modulos detectados dentro de sistema/modules/.
+                </div>
               </div>
               <div class="col-md-6">
-                <label for="pgl-archivo-section">Section</label>
+                <label for="pgl-archivo-section">
+                  Section
+                  <button type="button" class="pgl-info-toggle" data-info-target="pgl-info-section"><i class="fas fa-info-circle"></i></button>
+                </label>
                 <select class="form-control" id="pgl-archivo-section">
                   <option value="">Seleccionar section</option>
                 </select>
+                <div id="pgl-info-section" class="pgl-info-box d-none">
+                  En pagina real activa es obligatorio. Debe existir como archivo PHP valido dentro del modulo seleccionado.
+                </div>
               </div>
             </div>
 

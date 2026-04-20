@@ -36,6 +36,7 @@
 
   var els = {
     alert: document.getElementById('pgl-alert'),
+    formAlert: document.getElementById('pgl-form-alert'),
     tableBody: document.getElementById('pgl-table-body'),
     paginationInfo: document.getElementById('pgl-pagination-info'),
     btnPrev: document.getElementById('pgl-page-prev'),
@@ -93,18 +94,117 @@
       .replace(/'/g, '&#039;');
   }
 
+  function renderAlert(container, type, htmlContent) {
+    if (!container) return;
+    container.className = 'alert mb-3';
+    container.classList.add(type === 'success' ? 'alert-success' : 'alert-danger');
+    container.innerHTML = htmlContent || '';
+    container.classList.remove('d-none');
+  }
+
   function showAlert(type, message) {
-    if (!els.alert) return;
-    els.alert.className = 'alert mb-3';
-    els.alert.classList.add(type === 'success' ? 'alert-success' : 'alert-danger');
-    els.alert.textContent = message || '';
-    els.alert.classList.remove('d-none');
+    renderAlert(els.alert, type, escapeHtml(message || ''));
+  }
+
+  function showFormAlert(type, htmlContent) {
+    renderAlert(els.formAlert, type, htmlContent || '');
   }
 
   function hideAlert() {
-    if (!els.alert) return;
-    els.alert.classList.add('d-none');
-    els.alert.textContent = '';
+    if (els.alert) {
+      els.alert.classList.add('d-none');
+      els.alert.textContent = '';
+    }
+    if (els.formAlert) {
+      els.formAlert.classList.add('d-none');
+      els.formAlert.textContent = '';
+    }
+  }
+
+  function fieldMap() {
+    return {
+      tipo_pagina: els.inputTipoPagina,
+      slug_pagina: els.inputSlug,
+      id_padre: els.inputIdPadre,
+      titulo_menu: els.inputTituloMenu,
+      titulo_pagina: els.inputTituloPagina,
+      descripcion_pagina: els.inputDescripcion,
+      visible_menu: els.inputVisibleMenu,
+      estado: els.inputEstado,
+      orden_menu: els.inputOrdenMenu,
+      icono: els.inputIcono,
+      id_permiso_requerido: els.inputIdPermiso,
+      modulo_codigo: els.inputModuloCodigo,
+      archivo_section: els.inputArchivoSection
+    };
+  }
+
+  function clearFieldErrors() {
+    var map = fieldMap();
+    for (var key in map) {
+      if (!Object.prototype.hasOwnProperty.call(map, key)) continue;
+      var input = map[key];
+      if (input) input.classList.remove('is-invalid');
+    }
+  }
+
+  function applyFieldErrors(errors) {
+    clearFieldErrors();
+    if (!errors || typeof errors !== 'object') return;
+    var map = fieldMap();
+    for (var key in errors) {
+      if (!Object.prototype.hasOwnProperty.call(errors, key)) continue;
+      if (map[key]) map[key].classList.add('is-invalid');
+    }
+  }
+
+  function prettyFieldLabel(field) {
+    var labels = {
+      tipo_pagina: 'Tipo de pagina',
+      slug_pagina: 'Slug',
+      id_padre: 'Padre',
+      titulo_menu: 'Titulo menu',
+      titulo_pagina: 'Titulo pagina',
+      descripcion_pagina: 'Descripcion pagina',
+      visible_menu: 'Visible en sidebar',
+      estado: 'Estado',
+      orden_menu: 'Orden menu',
+      icono: 'Icono',
+      id_permiso_requerido: 'Permiso base requerido',
+      modulo_codigo: 'Modulo',
+      archivo_section: 'Section'
+    };
+    return labels[field] || field;
+  }
+
+  function buildValidationHtml(message, errors) {
+    var html = '<div>' + escapeHtml(message || 'Revisa los valores enviados.') + '</div>';
+    if (!errors || typeof errors !== 'object') {
+      return html;
+    }
+
+    var lines = [];
+    for (var key in errors) {
+      if (!Object.prototype.hasOwnProperty.call(errors, key)) continue;
+      var value = errors[key];
+      if (Array.isArray(value)) {
+        for (var i = 0; i < value.length; i++) {
+          lines.push(prettyFieldLabel(key) + ': ' + String(value[i] || ''));
+        }
+      } else {
+        lines.push(prettyFieldLabel(key) + ': ' + String(value || ''));
+      }
+    }
+
+    if (lines.length) {
+      html += '<ul class="mb-0 mt-2 pl-3">';
+      for (var j = 0; j < lines.length; j++) {
+        html += '<li>' + escapeHtml(lines[j]) + '</li>';
+      }
+      html += '</ul>';
+    }
+
+    return html;
   }
 
   function setUiLoading(isLoading) {
@@ -163,7 +263,12 @@
 
   function handleResponse(response, defaultError) {
     if (!response || typeof response !== 'object') {
-      showAlert('error', defaultError);
+      var modalAbiertoSinJson = !!(window.jQuery && els.modalForm && window.jQuery(els.modalForm).hasClass('show'));
+      if (modalAbiertoSinJson) {
+        showFormAlert('error', buildValidationHtml(defaultError || 'No se pudo procesar la respuesta del servidor.', null));
+      } else {
+        showAlert('error', defaultError);
+      }
       return null;
     }
 
@@ -178,10 +283,22 @@
         window.location.href = 'login.php?m=' + encodeURIComponent(loginMessage);
         return null;
       }
-      showAlert('error', response.message || defaultError);
+
+      var message = response.message || defaultError;
+      var errorHtml = buildValidationHtml(message, response.errors || null);
+      var modalAbierto = !!(window.jQuery && els.modalForm && window.jQuery(els.modalForm).hasClass('show'));
+
+      if (modalAbierto) {
+        showFormAlert('error', errorHtml);
+      } else {
+        showAlert('error', message);
+      }
+
+      applyFieldErrors(response.errors || null);
       return null;
     }
 
+    clearFieldErrors();
     return response;
   }
 
@@ -445,6 +562,8 @@
     state.formMode = 'create';
     state.editingRow = null;
     els.formCreateEdit.reset();
+    hideAlert();
+    clearFieldErrors();
 
     els.inputIdPagina.value = '0';
     els.inputEsFija.value = '0';
@@ -473,6 +592,8 @@
     state.formMode = 'edit';
     state.editingRow = row;
     els.formCreateEdit.reset();
+    hideAlert();
+    clearFieldErrors();
 
     var isFija = Number(row.es_fija) === 1;
     var tipo = Number(row.es_contenedor) === 1 ? 'contenedor' : 'real';
@@ -558,6 +679,64 @@
     return payload;
   }
 
+  function validatePayload(payload, isCreate, isFixed) {
+    var errors = {};
+    var tipo = String(payload.tipo_pagina || '');
+    var slug = String(payload.slug_pagina || '').trim();
+    var tituloMenu = String(payload.titulo_menu || '').trim();
+    var tituloPagina = String(payload.titulo_pagina || '').trim();
+    var ordenMenuRaw = String(payload.orden_menu || '0').trim();
+    var estado = String(payload.estado || '0');
+    var modulo = String(payload.modulo_codigo || '').trim();
+    var section = String(payload.archivo_section || '').trim();
+    var padre = String(payload.id_padre || '').trim();
+
+    if (!tituloMenu) {
+      errors.titulo_menu = 'Campo obligatorio.';
+    } else if (tituloMenu.length > 120) {
+      errors.titulo_menu = 'Maximo 120 caracteres.';
+    }
+
+    if (!tituloPagina) {
+      errors.titulo_pagina = 'Campo obligatorio.';
+    } else if (tituloPagina.length > 150) {
+      errors.titulo_pagina = 'Maximo 150 caracteres.';
+    }
+
+    if (!ordenMenuRaw.match(/^\d+$/)) {
+      errors.orden_menu = 'Debe ser numero entero mayor o igual a 0.';
+    }
+
+    if (isCreate) {
+      if (!slug) {
+        errors.slug_pagina = 'Campo obligatorio en crear.';
+      } else if (!slug.match(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)) {
+        errors.slug_pagina = 'Formato invalido. Usa minusculas, numeros y guion medio.';
+      }
+    }
+
+    if (!isFixed && tipo && tipo !== 'real' && tipo !== 'contenedor') {
+      errors.tipo_pagina = 'Tipo de pagina invalido.';
+    }
+
+    if (!isFixed && tipo === 'contenedor') {
+      if (padre !== '') {
+        errors.id_padre = 'En contenedor debe quedar sin padre (nivel 1).';
+      }
+    }
+
+    if (!isFixed && tipo === 'real' && estado === '1') {
+      if (!modulo) {
+        errors.modulo_codigo = 'Obligatorio al activar pagina real.';
+      }
+      if (!section) {
+        errors.archivo_section = 'Obligatorio al activar pagina real.';
+      }
+    }
+
+    return errors;
+  }
+
   function submitForm() {
     hideAlert();
     setUiLoading(true);
@@ -565,6 +744,16 @@
     var isCreate = state.formMode === 'create';
     var url = isCreate ? urls.create : urls.update;
     var payload = isCreate ? buildCreatePayload() : buildUpdatePayload();
+    var isFixed = Number(els.inputEsFija.value || 0) === 1;
+    var localErrors = validatePayload(payload, isCreate, isFixed);
+    if (Object.keys(localErrors).length) {
+      setUiLoading(false);
+      applyFieldErrors(localErrors);
+      showFormAlert('error', buildValidationHtml('Revisa los valores enviados.', localErrors));
+      return;
+    }
+
+    clearFieldErrors();
 
     postForm(url, payload, function (response) {
       setUiLoading(false);
@@ -677,6 +866,36 @@
   if (els.btnConfirmToggle) {
     els.btnConfirmToggle.addEventListener('click', function () {
       submitToggle();
+    });
+  }
+
+  if (els.modalForm) {
+    els.modalForm.addEventListener('click', function (event) {
+      var btnInfo = event.target.closest('.pgl-info-toggle');
+      if (!btnInfo) return;
+      event.preventDefault();
+
+      var targetId = btnInfo.getAttribute('data-info-target') || '';
+      if (!targetId) return;
+      var box = document.getElementById(targetId);
+      if (!box) return;
+
+      var all = els.modalForm.querySelectorAll('.pgl-info-box');
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].id !== targetId) all[i].classList.add('d-none');
+      }
+      box.classList.toggle('d-none');
+    });
+  }
+
+  if (window.jQuery && els.modalForm) {
+    window.jQuery(els.modalForm).on('hidden.bs.modal', function () {
+      hideAlert();
+      clearFieldErrors();
+      var all = els.modalForm.querySelectorAll('.pgl-info-box');
+      for (var i = 0; i < all.length; i++) {
+        all[i].classList.add('d-none');
+      }
     });
   }
 
