@@ -132,8 +132,21 @@
       if (xhr.readyState !== 4) return;
 
       var response = null;
+      var rawText = xhr.responseText || '';
+
+      // Tolera BOM y ruido accidental antes/despues del JSON.
+      rawText = rawText.replace(/^\uFEFF/, '');
+      var trimmed = rawText.trim();
+      if (trimmed !== '') {
+        var firstBrace = trimmed.indexOf('{');
+        var lastBrace = trimmed.lastIndexOf('}');
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+          trimmed = trimmed.substring(firstBrace, lastBrace + 1);
+        }
+      }
+
       try {
-        response = JSON.parse(xhr.responseText || '{}');
+        response = JSON.parse(trimmed || '{}');
       } catch (e) {
         response = null;
       }

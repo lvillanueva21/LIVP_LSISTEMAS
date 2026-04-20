@@ -22,7 +22,26 @@ function pgl_json_response($httpStatus, array $payload)
 {
     http_response_code((int) $httpStatus);
     header('Content-Type: application/json; charset=UTF-8');
-    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    $jsonOptions = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+        $jsonOptions |= JSON_INVALID_UTF8_SUBSTITUTE;
+    }
+
+    $json = json_encode($payload, $jsonOptions);
+    if (!is_string($json) || $json === '') {
+        $json = json_encode([
+            'ok' => false,
+            'code' => 'json_error',
+            'message' => 'No se pudo serializar la respuesta.',
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
+
+    echo $json;
     exit;
 }
 
