@@ -329,6 +329,7 @@ function pag_schema_seed_fixed_pages()
         ['codigo' => 'paginas_logicas.view', 'nombre' => 'Ver paginas logicas', 'descripcion' => 'Permite ver paginas logicas.'],
         ['codigo' => 'paginas_logicas.create', 'nombre' => 'Crear paginas logicas', 'descripcion' => 'Permite crear paginas logicas.'],
         ['codigo' => 'paginas_logicas.edit', 'nombre' => 'Editar paginas logicas', 'descripcion' => 'Permite editar paginas logicas.'],
+        ['codigo' => 'paginas_logicas.toggle_state', 'nombre' => 'Cambiar estado paginas logicas', 'descripcion' => 'Permite activar o inactivar paginas logicas.'],
         ['codigo' => 'paginas_logicas.delete', 'nombre' => 'Eliminar paginas logicas', 'descripcion' => 'Permite eliminar paginas logicas.'],
     ];
 
