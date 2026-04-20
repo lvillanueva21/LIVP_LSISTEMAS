@@ -81,7 +81,10 @@ try {
         throw new RuntimeException('nombre_duplicado');
     }
 
-    $stInsert = $pdo->prepare("\n        INSERT INTO lsis_roles (nombre, descripcion, estado, creado_en, actualizado_en)\n        VALUES (?, ?, 1, NOW(), NOW())\n    ");
+    $stInsert = $pdo->prepare("
+        INSERT INTO lsis_roles (nombre, descripcion, estado, es_sistema, es_protegido, creado_en, actualizado_en)
+        VALUES (?, ?, 1, 0, 0, NOW(), NOW())
+    ");
     $stInsert->execute([$nombre, $descripcion]);
 
     $newRoleId = (int) $pdo->lastInsertId();

@@ -151,6 +151,12 @@
     }
 
     if (response.ok !== true) {
+      var code = String(response.code || '');
+      if (code === 'acceso_actualizado' || code === 'sesion_requerida' || code === 'sesion_invalida' || code === 'timeout') {
+        var loginMessage = (code === 'acceso_actualizado') ? 'acceso_actualizado' : 'sesion';
+        window.location.href = 'login.php?m=' + encodeURIComponent(loginMessage);
+        return false;
+      }
       showAlert('error', response.message || defaultErrorMessage);
       return false;
     }

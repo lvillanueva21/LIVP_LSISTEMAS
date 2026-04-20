@@ -71,6 +71,9 @@ try {
     if (!$role) {
         throw new RuntimeException('rol_no_encontrado');
     }
+    $roleIsActive = ((int) ($role['estado'] ?? 0) === 1);
+    $affectedUserIds = $roleIsActive ? rls_fetch_active_user_ids_by_role($roleId, true) : [];
+    $beforePermissionIds = prm_fetch_assigned_active_permission_ids_by_role($roleId, true);
 
     if ($permissionIds) {
         $activeMap = prm_fetch_active_permission_ids_map_by_ids($permissionIds, true);
@@ -81,6 +84,20 @@ try {
 
     if (!prm_save_role_permissions($roleId, $permissionIds)) {
         throw new RuntimeException('no_se_pudo_guardar');
+    }
+
+    $afterPermissionIds = array_values(array_unique(array_filter(array_map('intval', $permissionIds), function ($value) {
+        return $value > 0;
+    })));
+    sort($afterPermissionIds);
+    $beforePermissionIds = array_values(array_unique(array_filter(array_map('intval', $beforePermissionIds), function ($value) {
+        return $value > 0;
+    })));
+    sort($beforePermissionIds);
+    $permissionsChanged = ($beforePermissionIds !== $afterPermissionIds);
+
+    if ($permissionsChanged && $affectedUserIds) {
+        lsis_close_active_sessions_by_user_ids($affectedUserIds, 'actualizacion_acceso');
     }
 
     if ($ownTx) {

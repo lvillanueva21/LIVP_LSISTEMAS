@@ -63,7 +63,7 @@ try {
         throw new RuntimeException('rol_no_encontrado');
     }
 
-    $nombreRol = (string) ($role['nombre'] ?? '');
+    $isProtectedRole = rls_role_is_protected_row($role);
     $estadoActual = ((int) ($role['estado'] ?? 0) === 1) ? 1 : 0;
 
     if ($estadoActual === $estadoObjetivo) {
@@ -81,9 +81,11 @@ try {
         ]);
     }
 
-    if (rls_is_superadmin_name($nombreRol) && $estadoObjetivo === 0) {
-        throw new RuntimeException('superadmin_no_inactivable');
+    if ($isProtectedRole && $estadoObjetivo === 0) {
+        throw new RuntimeException('rol_protegido_no_inactivable');
     }
+
+    $affectedUserIds = rls_fetch_active_user_ids_by_role($idRol, true);
 
     if ($estadoObjetivo === 0) {
         $affectedWithoutAlternative = rls_fetch_users_without_alternative_role_when_disabling($idRol);
@@ -97,6 +99,10 @@ try {
 
     if (rls_count_active_superadmin_users(true) < 1) {
         throw new RuntimeException('sin_superadmin_funcional');
+    }
+
+    if ($affectedUserIds) {
+        lsis_close_active_sessions_by_user_ids($affectedUserIds, 'actualizacion_acceso');
     }
 
     if ($ownTx) {
@@ -121,9 +127,9 @@ try {
         if ($e->getMessage() === 'rol_no_encontrado') {
             $code = 'rol_no_encontrado';
             $message = 'Rol no encontrado.';
-        } elseif ($e->getMessage() === 'superadmin_no_inactivable') {
-            $code = 'superadmin_no_inactivable';
-            $message = 'No se permite inactivar el rol Superadmin.';
+        } elseif ($e->getMessage() === 'rol_protegido_no_inactivable') {
+            $code = 'rol_protegido_no_inactivable';
+            $message = 'No se permite inactivar un rol protegido.';
         } elseif ($e->getMessage() === 'usuarios_quedan_sin_rol_activo') {
             $code = 'usuarios_quedan_sin_rol_activo';
             $message = 'No se puede inactivar: usuarios activos quedarian sin rol activo alternativo.';

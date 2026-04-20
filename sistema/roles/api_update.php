@@ -83,13 +83,13 @@ try {
     }
 
     $currentName = (string) ($role['nombre'] ?? '');
-    $isCurrentSuperadmin = rls_is_superadmin_name($currentName);
+    $isCurrentProtected = rls_role_is_protected_row($role);
 
-    if ($isCurrentSuperadmin && strcasecmp($currentName, $nombre) !== 0) {
-        throw new RuntimeException('superadmin_no_renombrable');
+    if ($isCurrentProtected && strcasecmp($currentName, $nombre) !== 0) {
+        throw new RuntimeException('rol_protegido_no_renombrable');
     }
 
-    if (!$isCurrentSuperadmin && rls_is_superadmin_name($nombre)) {
+    if (!$isCurrentProtected && rls_is_superadmin_name($nombre)) {
         throw new RuntimeException('superadmin_reservado');
     }
 
@@ -128,9 +128,9 @@ try {
         if ($e->getMessage() === 'rol_no_encontrado') {
             $code = 'rol_no_encontrado';
             $message = 'Rol no encontrado.';
-        } elseif ($e->getMessage() === 'superadmin_no_renombrable') {
-            $code = 'superadmin_no_renombrable';
-            $message = 'No se permite renombrar el rol Superadmin.';
+        } elseif ($e->getMessage() === 'rol_protegido_no_renombrable') {
+            $code = 'rol_protegido_no_renombrable';
+            $message = 'No se permite renombrar un rol protegido.';
             $validationErrors['nombre'] = 'Operacion bloqueada por seguridad.';
         } elseif ($e->getMessage() === 'superadmin_reservado') {
             $code = 'superadmin_reservado';

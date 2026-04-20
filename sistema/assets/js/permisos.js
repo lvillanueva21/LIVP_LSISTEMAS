@@ -109,6 +109,12 @@
     }
 
     if (response.ok !== true) {
+      var code = String(response.code || '');
+      if (code === 'acceso_actualizado' || code === 'sesion_requerida' || code === 'sesion_invalida' || code === 'timeout') {
+        var loginMessage = (code === 'acceso_actualizado') ? 'acceso_actualizado' : 'sesion';
+        window.location.href = 'login.php?m=' + encodeURIComponent(loginMessage);
+        return null;
+      }
       showAlert('error', response.message || defaultError);
       return null;
     }
@@ -158,8 +164,8 @@
 
     var parts = [];
     parts.push('Estado: ' + (Number(role.estado) === 1 ? 'Activo' : 'Inactivo'));
-    if (role.es_superadmin === 1 || Number(role.es_superadmin) === 1) {
-      parts.push('Rol base protegido por nombre (deuda tecnica V1)');
+    if (Number(role.es_protegido) === 1) {
+      parts.push('Rol protegido del sistema');
     }
     if (role.descripcion) {
       parts.push('Descripcion: ' + role.descripcion);

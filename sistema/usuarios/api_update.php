@@ -85,6 +85,7 @@ try {
     if (!$userRow) {
         throw new RuntimeException('usuario_no_encontrado');
     }
+    $beforeRoleIds = uadm_fetch_active_role_ids_for_user($idUsuario, true);
 
     $existingRoles = uadm_fetch_active_roles_by_ids($roleIds, true);
     if (count($existingRoles) !== count($roleIds)) {
@@ -92,10 +93,18 @@ try {
     }
 
     $userEstado = ((int) ($userRow['estado'] ?? 0) === 1) ? 1 : 0;
-    $superadminRoleId = uadm_superadmin_role_id(true);
-    if ($superadminRoleId > 0) {
+    $protectedRoleIds = lsis_auth_get_protected_system_role_ids(true, true);
+    if ($protectedRoleIds) {
         $wasSuperadmin = uadm_user_is_active_superadmin($idUsuario, true);
-        $willBeSuperadmin = ($userEstado === 1) && in_array($superadminRoleId, $roleIds, true);
+        $willBeSuperadmin = false;
+        if ($userEstado === 1) {
+            foreach ($protectedRoleIds as $protectedRoleId) {
+                if (in_array((int) $protectedRoleId, $roleIds, true)) {
+                    $willBeSuperadmin = true;
+                    break;
+                }
+            }
+        }
         if ($wasSuperadmin && !$willBeSuperadmin) {
             $activeSuperadmins = uadm_count_active_superadmins(true);
             if ($activeSuperadmins <= 1) {
@@ -119,6 +128,16 @@ try {
 
     if (!uadm_user_has_any_active_role($idUsuario, true)) {
         throw new RuntimeException('usuario_sin_rol_activo');
+    }
+
+    $afterRoleIds = array_values(array_unique(array_filter(array_map('intval', $roleIds), function ($value) {
+        return $value > 0;
+    })));
+    sort($afterRoleIds);
+    $rolesChanged = ($beforeRoleIds !== $afterRoleIds);
+
+    if ($rolesChanged) {
+        lsis_close_active_sessions_by_user_ids([$idUsuario], 'actualizacion_acceso');
     }
 
     if ($ownTx) {

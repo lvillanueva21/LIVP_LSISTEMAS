@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/instalacion.php';
 
@@ -27,6 +27,9 @@ if (isset($_GET['m']) && $_GET['m'] === 'sesion') {
 }
 if (isset($_GET['m']) && $_GET['m'] === 'logout') {
     $notice = 'Sesión cerrada correctamente.';
+}
+if (isset($_GET['m']) && $_GET['m'] === 'acceso_actualizado') {
+    $notice = 'Tu sesión se cerró por actualización de roles o permisos. Inicia sesión nuevamente.';
 }
 
 $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';

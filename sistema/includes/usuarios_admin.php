@@ -40,12 +40,17 @@ function uadm_guard_request($expectedMethod, $csrfToken, $permissionCode)
         ];
     }
 
-    if (!isAuthenticated()) {
+    $sessionGuard = lsis_auth_guard_active_session([
+        'touch_activity' => true,
+        'enforce_timeout' => true,
+        'logout_on_fail' => true,
+    ]);
+    if (empty($sessionGuard['ok'])) {
         return [
             'ok' => false,
-            'http_status' => 401,
-            'code' => 'sesion_requerida',
-            'message' => 'Sesion no valida.',
+            'http_status' => (int) ($sessionGuard['http_status'] ?? 401),
+            'code' => (string) ($sessionGuard['code'] ?? 'sesion_requerida'),
+            'message' => (string) ($sessionGuard['message'] ?? 'Sesion no valida.'),
         ];
     }
 
@@ -299,39 +304,38 @@ function uadm_user_has_any_active_role($userId, $forUpdate = false)
 
 function uadm_superadmin_role_id($forUpdate = false)
 {
-    $sql = "
-        SELECT id
-        FROM lsis_roles
-        WHERE estado = 1
-          AND LOWER(nombre) = 'superadmin'
-        LIMIT 1
-    ";
-    if ($forUpdate) {
-        $sql .= " FOR UPDATE";
+    $roleIds = lsis_auth_get_protected_system_role_ids((bool) $forUpdate, true);
+    if (!$roleIds) {
+        return 0;
     }
-
-    $row = db()->query($sql)->fetch();
-    return $row ? (int) $row['id'] : 0;
+    return (int) $roleIds[0];
 }
 
 function uadm_user_is_active_superadmin($userId, $forUpdate = false)
 {
+    return lsis_auth_user_is_active_protected_admin((int) $userId, (bool) $forUpdate);
+}
+
+function uadm_count_active_superadmins($forUpdate = false)
+{
+    return lsis_auth_count_active_protected_admin_users((bool) $forUpdate);
+}
+
+function uadm_fetch_active_role_ids_for_user($userId, $forUpdate = false)
+{
     $userId = (int) $userId;
     if ($userId <= 0) {
-        return false;
+        return [];
     }
 
     $sql = "
-        SELECT u.id
-        FROM lsis_usuarios u
-        INNER JOIN lsis_usuario_roles ur ON ur.id_usuario = u.id
+        SELECT ur.id_rol
+        FROM lsis_usuario_roles ur
         INNER JOIN lsis_roles r ON r.id = ur.id_rol
-        WHERE u.id = ?
-          AND u.estado = 1
+        WHERE ur.id_usuario = ?
           AND ur.estado = 1
           AND r.estado = 1
-          AND LOWER(r.nombre) = 'superadmin'
-        LIMIT 1
+        ORDER BY ur.id_rol ASC
     ";
     if ($forUpdate) {
         $sql .= " FOR UPDATE";
@@ -339,28 +343,19 @@ function uadm_user_is_active_superadmin($userId, $forUpdate = false)
 
     $st = db()->prepare($sql);
     $st->execute([$userId]);
-    $row = $st->fetch();
-    return !empty($row['id']);
-}
+    $rows = $st->fetchAll(PDO::FETCH_COLUMN);
 
-function uadm_count_active_superadmins($forUpdate = false)
-{
-    $sql = "
-        SELECT DISTINCT u.id
-        FROM lsis_usuarios u
-        INNER JOIN lsis_usuario_roles ur ON ur.id_usuario = u.id
-        INNER JOIN lsis_roles r ON r.id = ur.id_rol
-        WHERE u.estado = 1
-          AND ur.estado = 1
-          AND r.estado = 1
-          AND LOWER(r.nombre) = 'superadmin'
-    ";
-    if ($forUpdate) {
-        $sql .= " FOR UPDATE";
+    $ids = [];
+    foreach ((array) $rows as $value) {
+        $rid = (int) $value;
+        if ($rid > 0) {
+            $ids[] = $rid;
+        }
     }
 
-    $rows = db()->query($sql)->fetchAll(PDO::FETCH_COLUMN);
-    return is_array($rows) ? count($rows) : 0;
+    $ids = array_values(array_unique($ids));
+    sort($ids);
+    return $ids;
 }
 
 function uadm_sync_user_roles($userId, array $roleIds)

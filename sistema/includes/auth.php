@@ -54,7 +54,137 @@ function lsis_security_config()
     return lsis_get_security_policy();
 }
 
-function lsis_auth_is_superadmin_user_id($userId)
+function lsis_auth_roles_hardening_columns_ready()
+{
+    static $ready = null;
+    if ($ready !== null) {
+        return $ready;
+    }
+
+    if (!lsis_auth_table_exists('lsis_roles')) {
+        $ready = false;
+        return $ready;
+    }
+
+    try {
+        $sql = "
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'lsis_roles'
+              AND COLUMN_NAME IN ('es_sistema', 'es_protegido')
+        ";
+        $rows = db()->query($sql)->fetchAll(PDO::FETCH_COLUMN);
+        $rows = is_array($rows) ? $rows : [];
+        $map = array_fill_keys($rows, true);
+        $ready = isset($map['es_sistema']) && isset($map['es_protegido']);
+        return $ready;
+    } catch (Throwable $e) {
+        $ready = false;
+        return $ready;
+    }
+}
+
+function lsis_auth_get_protected_system_role_ids($forUpdate = false, $onlyActive = true)
+{
+    if (!lsis_auth_table_exists('lsis_roles')) {
+        return [];
+    }
+
+    $forUpdate = (bool) $forUpdate;
+    $onlyActive = (bool) $onlyActive;
+    $ids = [];
+
+    if (lsis_auth_roles_hardening_columns_ready()) {
+        $sql = "
+            SELECT id
+            FROM lsis_roles
+            WHERE es_sistema = 1
+              AND es_protegido = 1
+        ";
+        if ($onlyActive) {
+            $sql .= " AND estado = 1";
+        }
+        $sql .= " ORDER BY id ASC";
+        if ($forUpdate) {
+            $sql .= " FOR UPDATE";
+        }
+
+        $rows = db()->query($sql)->fetchAll(PDO::FETCH_COLUMN);
+        foreach ((array) $rows as $value) {
+            $rid = (int) $value;
+            if ($rid > 0) {
+                $ids[] = $rid;
+            }
+        }
+    }
+
+    // Compatibilidad temporal durante migracion: fallback por nombre.
+    if (!$ids) {
+        $sql = "
+            SELECT id
+            FROM lsis_roles
+            WHERE LOWER(nombre) = 'superadmin'
+        ";
+        if ($onlyActive) {
+            $sql .= " AND estado = 1";
+        }
+        $sql .= " ORDER BY id ASC";
+        if ($forUpdate) {
+            $sql .= " FOR UPDATE";
+        }
+
+        $rows = db()->query($sql)->fetchAll(PDO::FETCH_COLUMN);
+        foreach ((array) $rows as $value) {
+            $rid = (int) $value;
+            if ($rid > 0) {
+                $ids[] = $rid;
+            }
+        }
+    }
+
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids), function ($value) {
+        return $value > 0;
+    })));
+    sort($ids);
+    return $ids;
+}
+
+function lsis_auth_count_active_protected_admin_users($forUpdate = false)
+{
+    if (
+        !lsis_auth_table_exists('lsis_usuarios')
+        || !lsis_auth_table_exists('lsis_roles')
+        || !lsis_auth_table_exists('lsis_usuario_roles')
+    ) {
+        return 0;
+    }
+
+    $roleIds = lsis_auth_get_protected_system_role_ids($forUpdate, true);
+    if (!$roleIds) {
+        return 0;
+    }
+
+    $marks = implode(',', array_fill(0, count($roleIds), '?'));
+    $sql = "
+        SELECT DISTINCT u.id
+        FROM lsis_usuarios u
+        INNER JOIN lsis_usuario_roles ur ON ur.id_usuario = u.id
+        WHERE u.estado = 1
+          AND ur.estado = 1
+          AND ur.id_rol IN ($marks)
+    ";
+    if ($forUpdate) {
+        $sql .= " FOR UPDATE";
+    }
+
+    $st = db()->prepare($sql);
+    $st->execute($roleIds);
+    $rows = $st->fetchAll(PDO::FETCH_COLUMN);
+    return is_array($rows) ? count($rows) : 0;
+}
+
+function lsis_auth_user_is_active_protected_admin($userId, $forUpdate = false)
 {
     $userId = (int) $userId;
     if ($userId <= 0) {
@@ -69,22 +199,37 @@ function lsis_auth_is_superadmin_user_id($userId)
         return false;
     }
 
+    $roleIds = lsis_auth_get_protected_system_role_ids($forUpdate, true);
+    if (!$roleIds) {
+        return false;
+    }
+
+    $marks = implode(',', array_fill(0, count($roleIds), '?'));
     $sql = "
-        SELECT COUNT(*) AS c
+        SELECT u.id
         FROM lsis_usuarios u
         INNER JOIN lsis_usuario_roles ur ON ur.id_usuario = u.id
-        INNER JOIN lsis_roles r ON r.id = ur.id_rol
         WHERE u.id = ?
           AND u.estado = 1
           AND ur.estado = 1
-          AND r.estado = 1
-          AND r.nombre = 'Superadmin'
+          AND ur.id_rol IN ($marks)
+        LIMIT 1
     ";
+    if ($forUpdate) {
+        $sql .= " FOR UPDATE";
+    }
+
+    $params = array_merge([$userId], $roleIds);
     $st = db()->prepare($sql);
-    $st->execute([$userId]);
+    $st->execute($params);
     $row = $st->fetch();
 
-    return !empty($row['c']);
+    return !empty($row['id']);
+}
+
+function lsis_auth_is_superadmin_user_id($userId)
+{
+    return lsis_auth_user_is_active_protected_admin($userId, false);
 }
 
 function lsis_auth_admin_context_ok($actorAdminId, &$meta = null, array $options = [])
@@ -168,7 +313,7 @@ function lsis_hash_session_id($sessionId)
 
 function lsis_normalize_close_reason($motivo)
 {
-    $validos = ['logout', 'timeout', 'reemplazada', 'forzada_admin'];
+    $validos = ['logout', 'timeout', 'reemplazada', 'forzada_admin', 'actualizacion_acceso'];
     $motivo = trim((string) $motivo);
 
     if (!in_array($motivo, $validos, true)) {
@@ -208,6 +353,246 @@ function lsis_close_active_sessions_by_ids(array $ids, $motivo)
     $st = db()->prepare($sql);
     $st->execute($params);
     return (int) $st->rowCount();
+}
+
+function lsis_close_active_sessions_by_user_ids(array $userIds, $motivo)
+{
+    if (!$userIds || !lsis_auth_table_exists('lsis_sesiones')) {
+        return 0;
+    }
+
+    $userIds = array_values(array_filter(array_map('intval', $userIds), function ($value) {
+        return $value > 0;
+    }));
+    if (!$userIds) {
+        return 0;
+    }
+
+    $motivo = lsis_normalize_close_reason($motivo);
+    $marks = implode(',', array_fill(0, count($userIds), '?'));
+
+    $sql = "
+        UPDATE lsis_sesiones
+        SET estado = 0,
+            logout_at = NOW(),
+            motivo_cierre = ?,
+            actualizado_en = NOW()
+        WHERE estado = 1
+          AND id_usuario IN ($marks)
+    ";
+
+    $params = array_merge([$motivo], $userIds);
+    $st = db()->prepare($sql);
+    $st->execute($params);
+    return (int) $st->rowCount();
+}
+
+function lsis_auth_fetch_current_active_session_row($userId, $sessionHash)
+{
+    $userId = (int) $userId;
+    $sessionHash = trim((string) $sessionHash);
+    if ($userId <= 0 || $sessionHash === '') {
+        return null;
+    }
+
+    $st = db()->prepare("
+        SELECT id, ultima_actividad_at
+        FROM lsis_sesiones
+        WHERE id_usuario = ?
+          AND session_id_hash = ?
+          AND estado = 1
+        LIMIT 1
+    ");
+    $st->execute([$userId, $sessionHash]);
+    $row = $st->fetch();
+    return $row ?: null;
+}
+
+function lsis_auth_fetch_current_session_close_reason($userId, $sessionHash)
+{
+    $userId = (int) $userId;
+    $sessionHash = trim((string) $sessionHash);
+    if ($userId <= 0 || $sessionHash === '') {
+        return '';
+    }
+
+    $st = db()->prepare("
+        SELECT estado, motivo_cierre
+        FROM lsis_sesiones
+        WHERE id_usuario = ?
+          AND session_id_hash = ?
+        ORDER BY id DESC
+        LIMIT 1
+    ");
+    $st->execute([$userId, $sessionHash]);
+    $row = $st->fetch();
+    if (!$row) {
+        return '';
+    }
+
+    if ((int) ($row['estado'] ?? 0) === 1) {
+        return '';
+    }
+
+    return trim((string) ($row['motivo_cierre'] ?? ''));
+}
+
+function lsis_auth_check_current_session_state(array $options = [])
+{
+    $defaults = [
+        'touch_activity' => true,
+        'enforce_timeout' => true,
+    ];
+    $opts = array_merge($defaults, $options);
+
+    $meta = [
+        'ok' => false,
+        'code' => 'sesion_requerida',
+        'message' => 'Sesion no valida.',
+        'login_m' => 'sesion',
+        'session_row_id' => 0,
+    ];
+
+    if (!isAuthenticated()) {
+        return $meta;
+    }
+
+    $cfgSeg = lsis_security_config();
+    if ((int) ($cfgSeg['control_sesiones_activo'] ?? 0) !== 1) {
+        $meta['ok'] = true;
+        $meta['code'] = 'ok';
+        $meta['message'] = 'ok';
+        return $meta;
+    }
+
+    if (!lsis_auth_table_exists('lsis_sesiones')) {
+        $meta['code'] = 'sesion_invalida';
+        return $meta;
+    }
+
+    $uid = (int) ($_SESSION['user']['id'] ?? 0);
+    $sid = session_id();
+    if ($uid <= 0 || $sid === '') {
+        $meta['code'] = 'sesion_invalida';
+        return $meta;
+    }
+
+    $hash = lsis_hash_session_id($sid);
+
+    try {
+        $sesion = lsis_auth_fetch_current_active_session_row($uid, $hash);
+        if (!$sesion) {
+            $closeReason = lsis_auth_fetch_current_session_close_reason($uid, $hash);
+            if ($closeReason === 'actualizacion_acceso') {
+                $meta['code'] = 'acceso_actualizado';
+                $meta['message'] = 'Tu sesion se cerro por actualizacion de roles o permisos.';
+                $meta['login_m'] = 'acceso_actualizado';
+                return $meta;
+            }
+
+            $meta['code'] = 'sesion_invalida';
+            return $meta;
+        }
+
+        $meta['session_row_id'] = (int) ($sesion['id'] ?? 0);
+
+        if (!empty($opts['enforce_timeout'])) {
+            $timeoutActivo = ((int) ($cfgSeg['timeout_inactividad_activo'] ?? 0) === 1);
+            $timeoutMin = (int) ($cfgSeg['timeout_inactividad_minutos'] ?? 0);
+            if ($timeoutMin < 1) {
+                $timeoutMin = 1;
+            }
+
+            if ($timeoutActivo) {
+                $lastAt = strtotime((string) ($sesion['ultima_actividad_at'] ?? ''));
+                if ($lastAt !== false) {
+                    $elapsed = time() - $lastAt;
+                    if ($elapsed > ($timeoutMin * 60)) {
+                        $stTimeout = db()->prepare("
+                            UPDATE lsis_sesiones
+                            SET estado = 0,
+                                logout_at = NOW(),
+                                motivo_cierre = 'timeout',
+                                actualizado_en = NOW()
+                            WHERE id = ?
+                              AND estado = 1
+                        ");
+                        $stTimeout->execute([(int) $sesion['id']]);
+
+                        $meta['code'] = 'timeout';
+                        return $meta;
+                    }
+                }
+            }
+        }
+
+        if (!empty($opts['touch_activity'])) {
+            $stTouch = db()->prepare("
+                UPDATE lsis_sesiones
+                SET ultima_actividad_at = NOW(),
+                    ip = ?,
+                    user_agent = ?,
+                    actualizado_en = NOW()
+                WHERE id = ?
+                  AND estado = 1
+            ");
+            $stTouch->execute([lsis_client_ip(), lsis_client_user_agent(), (int) $sesion['id']]);
+        }
+
+        $meta['ok'] = true;
+        $meta['code'] = 'ok';
+        $meta['message'] = 'ok';
+        return $meta;
+    } catch (Throwable $e) {
+        $meta['code'] = 'sesion_error';
+        return $meta;
+    }
+}
+
+function lsis_auth_guard_active_session(array $options = [])
+{
+    $defaults = [
+        'touch_activity' => true,
+        'enforce_timeout' => true,
+        'logout_on_fail' => true,
+    ];
+    $opts = array_merge($defaults, $options);
+
+    $check = lsis_auth_check_current_session_state([
+        'touch_activity' => !empty($opts['touch_activity']),
+        'enforce_timeout' => !empty($opts['enforce_timeout']),
+    ]);
+
+    if (!empty($check['ok'])) {
+        return [
+            'ok' => true,
+            'http_status' => 200,
+            'code' => 'ok',
+            'message' => 'ok',
+            'login_m' => 'sesion',
+        ];
+    }
+
+    if (!empty($opts['logout_on_fail']) && isAuthenticated()) {
+        logout();
+    }
+
+    $code = (string) ($check['code'] ?? 'sesion_requerida');
+    $message = 'Sesion no valida.';
+    $loginM = (string) ($check['login_m'] ?? 'sesion');
+
+    if ($code === 'acceso_actualizado') {
+        $message = 'Tu sesion se cerro por actualizacion de roles o permisos.';
+        $loginM = 'acceso_actualizado';
+    }
+
+    return [
+        'ok' => false,
+        'http_status' => 401,
+        'code' => $code,
+        'message' => $message,
+        'login_m' => $loginM,
+    ];
 }
 
 function lsis_close_current_session_db($motivo)
@@ -439,64 +824,15 @@ function requireAuth()
         exit;
     }
 
-    $cfgSeg = lsis_security_config();
-    if ((int) $cfgSeg['control_sesiones_activo'] !== 1) {
-        return;
-    }
-
-    if (!lsis_auth_table_exists('lsis_sesiones')) {
-        logout();
-        header('Location: login.php?m=sesion');
+    $sessionGuard = lsis_auth_guard_active_session([
+        'touch_activity' => true,
+        'enforce_timeout' => true,
+        'logout_on_fail' => true,
+    ]);
+    if (empty($sessionGuard['ok'])) {
+        $loginM = (string) ($sessionGuard['login_m'] ?? 'sesion');
+        header('Location: login.php?m=' . rawurlencode($loginM));
         exit;
-    }
-
-    $uid = (int) ($_SESSION['user']['id'] ?? 0);
-    $sid = session_id();
-
-    if ($uid <= 0 || $sid === '') {
-        logout();
-        header('Location: login.php?m=sesion');
-        exit;
-    }
-
-    $hash = lsis_hash_session_id($sid);
-
-    try {
-        $st = db()->prepare("SELECT id, ultima_actividad_at FROM lsis_sesiones WHERE id_usuario = ? AND session_id_hash = ? AND estado = 1 LIMIT 1");
-        $st->execute([$uid, $hash]);
-        $sesion = $st->fetch();
-
-        if (!$sesion) {
-            logout();
-            header('Location: login.php?m=sesion');
-            exit;
-        }
-
-        $timeoutActivo = ((int) $cfgSeg['timeout_inactividad_activo'] === 1);
-        $timeoutMin = (int) $cfgSeg['timeout_inactividad_minutos'];
-        if ($timeoutMin < 1) {
-            $timeoutMin = 1;
-        }
-
-        if ($timeoutActivo) {
-            $lastAt = strtotime((string) ($sesion['ultima_actividad_at'] ?? ''));
-            if ($lastAt !== false) {
-                $elapsed = time() - $lastAt;
-                if ($elapsed > ($timeoutMin * 60)) {
-                    $stTimeout = db()->prepare("UPDATE lsis_sesiones SET estado = 0, logout_at = NOW(), motivo_cierre = 'timeout', actualizado_en = NOW() WHERE id = ? AND estado = 1");
-                    $stTimeout->execute([(int) $sesion['id']]);
-
-                    logout();
-                    header('Location: login.php?m=sesion');
-                    exit;
-                }
-            }
-        }
-
-        $stTouch = db()->prepare("UPDATE lsis_sesiones SET ultima_actividad_at = NOW(), ip = ?, user_agent = ?, actualizado_en = NOW() WHERE id = ? AND estado = 1");
-        $stTouch->execute([lsis_client_ip(), lsis_client_user_agent(), (int) $sesion['id']]);
-    } catch (Throwable $e) {
-        // Si hay error tecnico, no romper flujo visible actual.
     }
 }
 

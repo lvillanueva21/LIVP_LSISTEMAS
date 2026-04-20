@@ -98,7 +98,7 @@ $rlsCanToggle = pag_user_has_permission_code('roles.toggle_state');
       </div>
 
       <p class="text-muted small mt-3 mb-0">
-        Nota tecnica: la proteccion de Superadmin en V1 se basa en nombre y queda como deuda tecnica futura.
+        Nota tecnica: la proteccion principal usa rol protegido de sistema; el fallback por nombre queda temporal para compatibilidad.
       </p>
     </div>
   </div>

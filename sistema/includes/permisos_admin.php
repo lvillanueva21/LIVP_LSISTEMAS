@@ -49,12 +49,17 @@ function prm_guard_request($expectedMethod, $csrfToken, $permissionCode)
         ];
     }
 
-    if (!isAuthenticated()) {
+    $sessionGuard = lsis_auth_guard_active_session([
+        'touch_activity' => true,
+        'enforce_timeout' => true,
+        'logout_on_fail' => true,
+    ]);
+    if (empty($sessionGuard['ok'])) {
         return [
             'ok' => false,
-            'http_status' => 401,
-            'code' => 'sesion_requerida',
-            'message' => 'Sesion no valida.',
+            'http_status' => (int) ($sessionGuard['http_status'] ?? 401),
+            'code' => (string) ($sessionGuard['code'] ?? 'sesion_requerida'),
+            'message' => (string) ($sessionGuard['message'] ?? 'Sesion no valida.'),
         ];
     }
 
@@ -158,7 +163,7 @@ function prm_parse_permission_ids($rawPermissionIds)
 function prm_fetch_roles_catalog()
 {
     $sql = "
-        SELECT id, nombre, descripcion, estado
+        SELECT id, nombre, descripcion, estado, es_sistema, es_protegido
         FROM lsis_roles
         ORDER BY LOWER(nombre) ASC, id ASC
     ";
@@ -167,12 +172,15 @@ function prm_fetch_roles_catalog()
     $out = [];
     foreach ($rows as $row) {
         $name = (string) ($row['nombre'] ?? '');
+        $isProtected = rls_role_is_protected_row($row);
         $out[] = [
             'id' => (int) ($row['id'] ?? 0),
             'nombre' => $name,
             'descripcion' => (string) ($row['descripcion'] ?? ''),
             'estado' => ((int) ($row['estado'] ?? 0) === 1) ? 1 : 0,
             'es_superadmin' => rls_is_superadmin_name($name) ? 1 : 0,
+            'es_sistema' => ((int) ($row['es_sistema'] ?? 0) === 1) ? 1 : 0,
+            'es_protegido' => $isProtected ? 1 : 0,
         ];
     }
 
@@ -207,7 +215,7 @@ function prm_fetch_role_by_id($roleId, $forUpdate = false)
     return rls_fetch_role_by_id($roleId, $forUpdate);
 }
 
-function prm_fetch_assigned_active_permission_ids_by_role($roleId)
+function prm_fetch_assigned_active_permission_ids_by_role($roleId, $forUpdate = false)
 {
     $roleId = (int) $roleId;
     if ($roleId <= 0) {
@@ -223,6 +231,9 @@ function prm_fetch_assigned_active_permission_ids_by_role($roleId)
           AND p.estado = 1
         ORDER BY rp.id_permiso ASC
     ";
+    if ($forUpdate) {
+        $sql .= " FOR UPDATE";
+    }
     $st = db()->prepare($sql);
     $st->execute([$roleId]);
     $rows = $st->fetchAll(PDO::FETCH_COLUMN);

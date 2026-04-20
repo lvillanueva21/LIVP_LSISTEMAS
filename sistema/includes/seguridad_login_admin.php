@@ -45,12 +45,17 @@ function slg_admin_guard_request($expectedMethod, $csrfToken)
         ];
     }
 
-    if (!isAuthenticated()) {
+    $sessionGuard = lsis_auth_guard_active_session([
+        'touch_activity' => true,
+        'enforce_timeout' => true,
+        'logout_on_fail' => true,
+    ]);
+    if (empty($sessionGuard['ok'])) {
         return [
             'ok' => false,
-            'http_status' => 401,
-            'code' => 'sesion_requerida',
-            'message' => 'Sesion no valida.',
+            'http_status' => (int) ($sessionGuard['http_status'] ?? 401),
+            'code' => (string) ($sessionGuard['code'] ?? 'sesion_requerida'),
+            'message' => (string) ($sessionGuard['message'] ?? 'Sesion no valida.'),
         ];
     }
 

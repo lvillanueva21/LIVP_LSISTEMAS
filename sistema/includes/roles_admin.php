@@ -50,12 +50,17 @@ function rls_guard_request($expectedMethod, $csrfToken, $permissionCode)
         ];
     }
 
-    if (!isAuthenticated()) {
+    $sessionGuard = lsis_auth_guard_active_session([
+        'touch_activity' => true,
+        'enforce_timeout' => true,
+        'logout_on_fail' => true,
+    ]);
+    if (empty($sessionGuard['ok'])) {
         return [
             'ok' => false,
-            'http_status' => 401,
-            'code' => 'sesion_requerida',
-            'message' => 'Sesion no valida.',
+            'http_status' => (int) ($sessionGuard['http_status'] ?? 401),
+            'code' => (string) ($sessionGuard['code'] ?? 'sesion_requerida'),
+            'message' => (string) ($sessionGuard['message'] ?? 'Sesion no valida.'),
         ];
     }
 
@@ -131,14 +136,50 @@ function rls_roles_has_descripcion_column()
     }
 }
 
+function rls_roles_has_access_hardening_columns()
+{
+    if (!lsis_table_exists_cached('lsis_roles')) {
+        return false;
+    }
+
+    try {
+        $sql = "
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'lsis_roles'
+              AND COLUMN_NAME IN ('es_sistema', 'es_protegido')
+        ";
+        $rows = db()->query($sql)->fetchAll(PDO::FETCH_COLUMN);
+        $rows = is_array($rows) ? $rows : [];
+        $map = array_fill_keys($rows, true);
+        return isset($map['es_sistema']) && isset($map['es_protegido']);
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 function rls_schema_ready()
 {
-    return rls_required_tables_exist() && rls_roles_has_descripcion_column();
+    return rls_required_tables_exist()
+        && rls_roles_has_descripcion_column()
+        && rls_roles_has_access_hardening_columns();
 }
 
 function rls_is_superadmin_name($name)
 {
     return strtolower(trim((string) $name)) === 'superadmin';
+}
+
+function rls_role_is_protected_row(array $roleRow)
+{
+    $isProtected = ((int) ($roleRow['es_protegido'] ?? 0) === 1);
+    if ($isProtected) {
+        return true;
+    }
+
+    // Compatibilidad temporal: fallback por nombre durante transicion.
+    return rls_is_superadmin_name((string) ($roleRow['nombre'] ?? ''));
 }
 
 function rls_validate_role_name($name)
@@ -177,7 +218,7 @@ function rls_fetch_role_by_id($roleId, $forUpdate = false)
     }
 
     $sql = "
-        SELECT id, nombre, descripcion, estado, creado_en, actualizado_en
+        SELECT id, nombre, descripcion, estado, es_sistema, es_protegido, creado_en, actualizado_en
         FROM lsis_roles
         WHERE id = ?
         LIMIT 1
@@ -201,7 +242,7 @@ function rls_find_role_by_name_ci($name, $excludeRoleId = 0, $forUpdate = false)
 
     $excludeRoleId = (int) $excludeRoleId;
     $sql = "
-        SELECT id, nombre, descripcion, estado
+        SELECT id, nombre, descripcion, estado, es_sistema, es_protegido
         FROM lsis_roles
         WHERE LOWER(nombre) = LOWER(?)
     ";
@@ -223,22 +264,7 @@ function rls_find_role_by_name_ci($name, $excludeRoleId = 0, $forUpdate = false)
 
 function rls_count_active_superadmin_users($forUpdate = false)
 {
-    $sql = "
-        SELECT DISTINCT u.id
-        FROM lsis_usuarios u
-        INNER JOIN lsis_usuario_roles ur ON ur.id_usuario = u.id
-        INNER JOIN lsis_roles r ON r.id = ur.id_rol
-        WHERE u.estado = 1
-          AND ur.estado = 1
-          AND r.estado = 1
-          AND LOWER(r.nombre) = 'superadmin'
-    ";
-    if ($forUpdate) {
-        $sql .= ' FOR UPDATE';
-    }
-
-    $rows = db()->query($sql)->fetchAll(PDO::FETCH_COLUMN);
-    return is_array($rows) ? count($rows) : 0;
+    return lsis_auth_count_active_protected_admin_users((bool) $forUpdate);
 }
 
 function rls_list_roles($page, $perPage, $search, $estado)
@@ -306,6 +332,8 @@ function rls_list_roles($page, $perPage, $search, $estado)
             r.nombre,
             r.descripcion,
             r.estado,
+            r.es_sistema,
+            r.es_protegido,
             r.creado_en,
             r.actualizado_en,
             COUNT(DISTINCT CASE WHEN ur.estado = 1 AND u.estado = 1 THEN u.id END) AS usuarios_activos_asignados
@@ -313,7 +341,7 @@ function rls_list_roles($page, $perPage, $search, $estado)
         LEFT JOIN lsis_usuario_roles ur ON ur.id_rol = r.id
         LEFT JOIN lsis_usuarios u ON u.id = ur.id_usuario
         WHERE {$whereSql}
-        GROUP BY r.id, r.nombre, r.descripcion, r.estado, r.creado_en, r.actualizado_en
+        GROUP BY r.id, r.nombre, r.descripcion, r.estado, r.es_sistema, r.es_protegido, r.creado_en, r.actualizado_en
         ORDER BY LOWER(r.nombre) ASC, r.id ASC
         LIMIT ? OFFSET ?
     ";
@@ -333,12 +361,15 @@ function rls_list_roles($page, $perPage, $search, $estado)
     $items = [];
     foreach ($rows as $row) {
         $nombre = (string) ($row['nombre'] ?? '');
+        $isProtected = rls_role_is_protected_row($row);
         $items[] = [
             'id' => (int) ($row['id'] ?? 0),
             'nombre' => $nombre,
             'descripcion' => (string) ($row['descripcion'] ?? ''),
             'estado' => ((int) ($row['estado'] ?? 0) === 1) ? 1 : 0,
             'es_superadmin' => rls_is_superadmin_name($nombre) ? 1 : 0,
+            'es_sistema' => ((int) ($row['es_sistema'] ?? 0) === 1) ? 1 : 0,
+            'es_protegido' => $isProtected ? 1 : 0,
             'usuarios_activos_asignados' => (int) ($row['usuarios_activos_asignados'] ?? 0),
             'creado_en' => (string) ($row['creado_en'] ?? ''),
             'actualizado_en' => (string) ($row['actualizado_en'] ?? ''),
@@ -356,6 +387,42 @@ function rls_list_roles($page, $perPage, $search, $estado)
             'estado' => $estadoFilter,
         ],
     ];
+}
+
+function rls_fetch_active_user_ids_by_role($roleId, $forUpdate = false)
+{
+    $roleId = (int) $roleId;
+    if ($roleId <= 0) {
+        return [];
+    }
+
+    $sql = "
+        SELECT DISTINCT u.id
+        FROM lsis_usuarios u
+        INNER JOIN lsis_usuario_roles ur ON ur.id_usuario = u.id
+        WHERE ur.id_rol = ?
+          AND ur.estado = 1
+          AND u.estado = 1
+    ";
+    if ($forUpdate) {
+        $sql .= " FOR UPDATE";
+    }
+
+    $st = db()->prepare($sql);
+    $st->execute([$roleId]);
+    $rows = $st->fetchAll(PDO::FETCH_COLUMN);
+
+    $ids = [];
+    foreach ((array) $rows as $value) {
+        $uid = (int) $value;
+        if ($uid > 0) {
+            $ids[] = $uid;
+        }
+    }
+
+    $ids = array_values(array_unique($ids));
+    sort($ids);
+    return $ids;
 }
 
 function rls_fetch_users_without_alternative_role_when_disabling($roleId)

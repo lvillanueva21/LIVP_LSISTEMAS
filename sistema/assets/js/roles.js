@@ -136,6 +136,12 @@
       setCsrf(response.csrf_token_nuevo);
     }
     if (response.ok !== true) {
+      var code = String(response.code || '');
+      if (code === 'acceso_actualizado' || code === 'sesion_requerida' || code === 'sesion_invalida' || code === 'timeout') {
+        var loginMessage = (code === 'acceso_actualizado') ? 'acceso_actualizado' : 'sesion';
+        window.location.href = 'login.php?m=' + encodeURIComponent(loginMessage);
+        return null;
+      }
       showAlert('error', response.message || defaultError);
       return null;
     }
@@ -161,7 +167,7 @@
         var row = state.rows[i] || {};
         var estado = Number(row.estado) === 1 ? 'Activo' : 'Inactivo';
         var estadoClass = Number(row.estado) === 1 ? 'badge-success' : 'badge-secondary';
-        var esSuperadmin = Number(row.es_superadmin) === 1;
+        var esProtegido = Number(row.es_protegido) === 1;
 
         var actions = [];
         if (can.edit) {
@@ -169,7 +175,7 @@
         }
 
         if (can.toggle) {
-          if (esSuperadmin) {
+          if (esProtegido) {
             actions.push('<span class="badge badge-dark">Protegido</span>');
           } else if (Number(row.estado) === 1) {
             actions.push('<button type="button" class="btn btn-xs btn-warning rls-action-toggle" data-id="' + row.id + '" data-estado="0">Inactivar</button>');
@@ -259,7 +265,7 @@
     if (els.inputIdRol) els.inputIdRol.value = String(row.id || 0);
     if (els.inputNombre) {
       els.inputNombre.value = row.nombre || '';
-      els.inputNombre.readOnly = Number(row.es_superadmin) === 1;
+      els.inputNombre.readOnly = Number(row.es_protegido) === 1;
     }
     if (els.inputDescripcion) els.inputDescripcion.value = row.descripcion || '';
     if (els.modalFormTitle) els.modalFormTitle.textContent = 'Editar rol';
